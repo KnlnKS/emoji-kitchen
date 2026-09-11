@@ -67,7 +67,6 @@ internal fun CombineCard(
     state: KitchenState,
     keyboardSetup: Boolean,
     onSetUpKeyboard: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val kitchen = LocalKitchen.current
     val colors = KitchenTheme.colors
@@ -89,7 +88,7 @@ internal fun CombineCard(
     }
     val star: () -> Unit = remember(state) { { kitchen.favorites.toggle(Combo.of(state.a, state.b)) } }
     Column(
-        modifier
+        Modifier
             .fillMaxWidth()
             .raised(CardShape, colors.shadow)
             .background(colors.surface, CardShape)

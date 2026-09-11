@@ -6,15 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
@@ -45,43 +42,39 @@ internal fun ExploreTab(
     val e = state.explore
     val shown = remember { e }
     LaunchedEffect(e) { if (e != shown) grid.scrollToItem(0) }
-    Box(Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = TileColumns,
-            state = grid,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 32.dp, top = 4.dp, end = 32.dp, bottom = 250.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            items(kitchen.partnerCount(e), key = { kitchen.partner(e, it) }, contentType = ComboContent) { k ->
-                ComboCell(kitchen.partnerItem(e, k), onLoad, shape = TileShape, imageScale = 0.78f)
-            }
-        }
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 17.dp, end = 17.dp, bottom = 12.dp)
-                .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val height = (constraints.maxHeight * 0.32f).roundToInt()
-                        .coerceIn(152.dp.roundToPx(), 227.dp.roundToPx())
-                    val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
-                    layout(placeable.width, height) { placeable.place(0, 0) }
-                }
-                .raised(TileShape, colors.shadow)
-                .clip(TileShape)
-                .background(colors.surface)
-                .border(1.dp, colors.border, TileShape),
-        ) {
-            LazyVerticalGrid(
-                columns = EmojiColumns,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 13.dp, top = 1.dp, end = 13.dp, bottom = 13.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
+    ReachPage(
+        grid,
+        TileColumns,
+        32.dp,
+        4.dp,
+        4.dp,
+        card = {
+            Box(
+                Modifier
+                    .layout { measurable, constraints ->
+                        val height = (constraints.maxHeight * 0.32f).roundToInt()
+                            .coerceIn(152.dp.roundToPx(), 227.dp.roundToPx())
+                        val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
+                        layout(placeable.width, height) { placeable.place(0, 0) }
+                    }
+                    .raised(TileShape, colors.shadow)
+                    .clip(TileShape)
+                    .background(colors.surface)
+                    .border(1.dp, colors.border, TileShape),
             ) {
-                emojiSections(kitchen, sections, titles, collapsed, e, -1, -1, state.onExplore)
+                LazyVerticalGrid(
+                    columns = EmojiColumns,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 13.dp, top = 1.dp, end = 13.dp, bottom = 13.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    emojiSections(kitchen, sections, titles, collapsed, e, -1, -1, state.onExplore)
+                }
             }
+        },
+    ) {
+        items(kitchen.partnerCount(e), key = { kitchen.partner(e, it) }, contentType = ComboContent) { k ->
+            ComboCell(kitchen.partnerItem(e, k), onLoad, shape = TileShape, imageScale = 0.78f)
         }
     }
 }

@@ -2,46 +2,30 @@ package com.kunalan.emojikitchen
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.AtLeast
 import com.kunalan.emojikitchen.ui.Centered
-import com.kunalan.emojikitchen.ui.FullSpan
 import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.LocalKitchen
 import com.kunalan.emojikitchen.ui.Sections
@@ -80,14 +64,10 @@ fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
     ) {
         TabBar(state, pager, go, Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp))
         HorizontalPager(pager, Modifier.weight(1f), beyondViewportPageCount = if (state.explored) 1 else 0) { page ->
-            Box(Modifier.fillMaxSize()) {
-                if (page == Combine) {
-                    CombineTab(state, sections, titles, combineGrid, keyboardSetup, onSetUpKeyboard)
-                    Fade(combineGrid, colors.surface)
-                } else {
-                    ExploreTab(state, sections, titles, exploreGrid, loadExplored)
-                    Fade(exploreGrid, colors.surface)
-                }
+            if (page == Combine) {
+                CombineTab(state, sections, titles, combineGrid, keyboardSetup, onSetUpKeyboard)
+            } else {
+                ExploreTab(state, sections, titles, exploreGrid, loadExplored)
             }
         }
         Label(
@@ -123,37 +103,10 @@ private fun CombineTab(
     val a = state.a
     val b = state.b
     val other = state.other
-    LazyVerticalGrid(
-        columns = EmojiColumns,
-        state = grid,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 3.dp, end = 16.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(1.dp),
-    ) {
-        item("card", FullSpan, "card") {
-            CombineCard(state, keyboardSetup, onSetUpKeyboard, Modifier.bleed(1.dp).padding(bottom = 15.dp))
-        }
+    ReachPage(grid, EmojiColumns, 16.dp, 0.dp, 1.dp, card = { CombineCard(state, keyboardSetup, onSetUpKeyboard) }) {
         favorites(kitchen, favorites, favoritesTitle, collapsed, state.onLoad)
         emojiSections(kitchen, sections, titles, collapsed, a, b, other, state.onPick)
     }
-}
-
-@Composable
-private fun BoxScope.Fade(grid: LazyGridState, color: Color) {
-    val atEnd by remember(grid) { derivedStateOf { !grid.canScrollForward } }
-    val height = animateDpAsState(if (atEnd) 20.dp else 48.dp, tween(500))
-    val brush = remember(color) { Brush.verticalGradient(listOf(color.copy(alpha = 0f), color)) }
-    Spacer(
-        Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .layout { measurable, constraints ->
-                val px = height.value.roundToPx()
-                val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, px))
-                layout(placeable.width, px) { placeable.place(0, 0) }
-            }
-            .background(brush),
-    )
 }
 
 @Composable

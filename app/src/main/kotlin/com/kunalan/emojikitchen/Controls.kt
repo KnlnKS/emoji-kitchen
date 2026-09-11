@@ -44,11 +44,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -64,14 +62,6 @@ internal val PillText = TextStyle(fontFamily = KitchenFont, fontSize = 14.sp, li
 internal val OperatorText = TextStyle(fontFamily = KitchenFont, fontSize = 26.sp)
 internal val Caption = TextStyle(fontFamily = KitchenFont, fontSize = 13.sp)
 internal val Footnote = TextStyle(fontFamily = KitchenFont, fontSize = 11.sp)
-
-internal fun Modifier.bleed(x: Dp) = layout { measurable, constraints ->
-    val px = x.roundToPx()
-    val placeable = measurable.measure(
-        constraints.copy(minWidth = constraints.minWidth + 2 * px, maxWidth = constraints.maxWidth + 2 * px),
-    )
-    layout(constraints.maxWidth, placeable.height) { placeable.place(-px, 0) }
-}
 
 internal fun Modifier.raised(shape: Shape, color: Color): Modifier =
     if (color.alpha == 0f) this else dropShadow(shape, Shadow(6.dp, color, offset = DpOffset(0.dp, 2.dp)))
