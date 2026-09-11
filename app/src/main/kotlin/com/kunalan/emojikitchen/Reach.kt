@@ -1,5 +1,11 @@
 package com.kunalan.emojikitchen
 
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PathMeasure
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
@@ -16,29 +22,44 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.VectorPath
+import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.FullSpan
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
+import kotlinx.coroutines.flow.collectLatest
 
 @Stable
 private class Reach(private val side: Dp, private val grid: LazyGridState) : PaddingValues, SnapLayoutInfoProvider {
@@ -47,6 +68,11 @@ private class Reach(private val side: Dp, private val grid: LazyGridState) : Pad
     private var projected = Float.NaN
 
     val gap: Dp get() = maxOf(0f, (page - inset) / 2).dp
+
+    fun Density.fade(): Float {
+        val px = gap.toPx()
+        return if (px > 0f && grid.firstVisibleItemIndex == 0) (1f - 2f * grid.firstVisibleItemScrollOffset / px).coerceIn(0f, 1f) else 0f
+    }
 
     override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = side
     override fun calculateTopPadding(): Dp = 0.dp
@@ -78,6 +104,45 @@ private class Reach(private val side: Dp, private val grid: LazyGridState) : Pad
     }
 }
 
+private val WispEasing = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
+private const val WispMillis = 300f
+private const val WispStagger = 60f
+
+private class Steam(vector: ImageVector) {
+    private val source = vector.root[0] as VectorPath
+    private val wisps = PathMeasure(source.pathData.toPath().asAndroidPath(), false).run {
+        buildList { do add(PathMeasure(Path().also { getSegment(0f, length, it, true) }, false)) while (nextContour()) }
+    }
+    private val millis = WispMillis + (wisps.size - 1) * WispStagger
+    private val viewport = vector.viewportWidth
+    private val segment = Path()
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = source.strokeLineWidth
+        color = (source.stroke as SolidColor).value.toArgb()
+    }
+    val spec = tween<Float>(millis.toInt(), easing = LinearEasing)
+
+    fun DrawScope.draw(progress: Float) {
+        if (progress <= 0f) return
+        val elapsed = progress * millis
+        val canvas = drawContext.canvas.nativeCanvas
+        canvas.save()
+        canvas.scale(size.width / viewport, size.height / viewport)
+        for (i in wisps.indices) {
+            val p = WispEasing.transform(((elapsed - i * WispStagger) / WispMillis).coerceIn(0f, 1f))
+            if (p > 0f) {
+                val wisp = wisps[i]
+                segment.rewind()
+                wisp.getSegment(0f, wisp.length * p, segment, true)
+                canvas.drawPath(segment, paint)
+            }
+        }
+        canvas.restore()
+    }
+}
+
 @Composable
 internal fun ReachPage(
     grid: LazyGridState,
@@ -89,6 +154,8 @@ internal fun ReachPage(
     content: LazyGridScope.() -> Unit,
 ) {
     val reach = remember(side, grid) { Reach(side, grid) }
+    val vector = ImageVector.vectorResource(R.drawable.logo_steam)
+    val steam = remember(vector) { Steam(vector) }
     val decay = rememberSplineBasedDecay<Float>()
     val fling = remember(reach, decay) { snapFlingBehavior(reach, decay, SettleSpec) }
     val horizontal = remember(columnSpacing) { Arrangement.spacedBy(columnSpacing) }
@@ -103,7 +170,7 @@ internal fun ReachPage(
                 horizontalArrangement = horizontal,
                 flingBehavior = fling,
             ) {
-                item("reach", FullSpan, "reach") { Gap(reach, grid) }
+                item("reach", FullSpan, "reach") { Gap(reach, steam) }
                 content()
             }
             Fade(grid)
@@ -129,9 +196,16 @@ internal fun ReachPage(
 }
 
 @Composable
-private fun Gap(reach: Reach, grid: LazyGridState) {
+private fun Gap(reach: Reach, steam: Steam) {
     val name = stringResource(R.string.app_name)
-    val logo = painterResource(R.drawable.ic_launcher_foreground)
+    val pot = painterResource(R.drawable.logo_pot)
+    val density = LocalDensity.current
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(reach, steam, density) {
+        snapshotFlow { with(reach) { density.fade() } > 0f }.collectLatest { shown ->
+            if (shown) progress.animateTo(1f, steam.spec) else progress.snapTo(0f)
+        }
+    }
     Box(
         Modifier.layout { measurable, constraints ->
             val height = reach.gap.roundToPx()
@@ -143,12 +217,10 @@ private fun Gap(reach: Reach, grid: LazyGridState) {
         Spacer(
             Modifier
                 .requiredSize(108.dp)
-                .graphicsLayer {
-                    val gap = reach.gap.toPx()
-                    alpha = if (gap > 0f) (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f) else 0f
-                }
+                .graphicsLayer { alpha = with(reach) { fade() } }
                 .semantics { contentDescription = name }
-                .paint(logo),
+                .drawBehind { with(steam) { draw(progress.value) } }
+                .paint(pot),
         )
     }
 }
