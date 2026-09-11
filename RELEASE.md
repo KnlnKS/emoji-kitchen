@@ -50,3 +50,24 @@ unzip -v combopack.apk | grep kitchen.pak
 ```
 
 The `unzip -v` output must show `Stored`.
+
+## CI releases
+
+Every push to `main` runs `.github/workflows/ci.yml`. It builds `bundleRelease` with the full pack, uses bundletool to turn it into a signed universal APK with the pack folded in, and publishes that as release `v1.0.<run number>`. Pull requests only run the unit tests and build a debug APK.
+
+The packs are never committed, so CI downloads them from the `pack` pre-release. After rebuilding them, replace its assets:
+
+```
+gh release upload pack $EK_DATA/out/kitchen.pak $EK_DATA/out/kitchen-mini.pak --clobber
+```
+
+CI signs the APK with the upload key, read from four repository secrets:
+
+```
+base64 < ~/keys/emoji-kitchen-upload.jks | gh secret set KEYSTORE_BASE64
+gh secret set KEYSTORE_PASSWORD
+gh secret set KEY_ALIAS --body upload
+gh secret set KEY_PASSWORD
+```
+
+A run on `main` fails in its first step if any of them is missing. GitHub APKs are signed with the upload key rather than Play's app signing key, so a GitHub install and a Play install can't update each other.
