@@ -16,8 +16,8 @@ import urllib.error
 import urllib.request
 from array import array
 from bisect import bisect_left
-from concurrent.futures import ThreadPoolExecutor
-from itertools import accumulate, chain
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from itertools import accumulate, batched, chain
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -37,6 +37,7 @@ C = 7
 MAGIC, VERSION = 0x4B504B45, 2
 HEADER = struct.Struct("<IHH11I12x")
 RETRIES = 3
+BATCH = 4096
 
 
 def retry(request):
@@ -85,33 +86,29 @@ def download(url):
 
 
 def encode(src, dest):
-    if not dest.exists():
-        png = io.BytesIO()
-        Image.open(src).convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS).save(png, "PNG", compress_level=0)
-        part = dest.with_suffix(".part.avif")
-        subprocess.run([AVIFENC, "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
-                        "--qalpha", str(ALPHA_QUALITY), "-y", "444", str(part)],
-                       input=png.getvalue(), check=True, capture_output=True)
-        os.replace(part, dest)
+    png = io.BytesIO()
+    Image.open(src).convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS).save(png, "PNG", compress_level=0)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".part.avif")
+    subprocess.run([AVIFENC, "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
+                    "--qalpha", str(ALPHA_QUALITY), "-y", "444", str(part)],
+                   input=png.getvalue(), check=True, capture_output=True)
+    os.replace(part, dest)
     return dest
 
 
 def build_images(jobs):
     def job(rel, urls):
         png, avif = PNG / rel, AVIF / f"{rel}.avif"
-        avif.parent.mkdir(parents=True, exist_ok=True)
-        if avif.exists() or fetch(urls, png):
-            return enc.submit(encode, png, avif)
-        return None
+        if avif.exists():
+            return avif
+        return encode(png, avif) if fetch(urls, png) else None
 
     start, out = time.monotonic(), []
-    with ThreadPoolExecutor(os.cpu_count()) as enc, ThreadPoolExecutor(32) as dl:
-        futures = [dl.submit(job, rel, urls) for rel, urls in jobs]
-        for i, f in enumerate(futures, 1):
-            e = f.result()
-            out.append(e and e.result())
-            if i % 10000 == 0 or i == len(futures):
-                print(f"images {i}/{len(futures)} {time.monotonic() - start:.0f}s")
+    with ThreadPoolExecutor(os.cpu_count()) as pool:
+        for batch in batched(jobs, BATCH):
+            out += pool.map(lambda j: job(*j), batch)
+            print(f"images {len(out)}/{len(jobs)} {time.monotonic() - start:.0f}s")
     return out
 
 
@@ -173,8 +170,15 @@ def probe(pairs, dates):
     return [cache[key] for key in keys]
 
 
-def load(k):
+def dataset_urls():
     data = json.loads(download(METADATA_URL))["data"]
+    return {frozenset((cp, other)): c["gStaticUrl"] for cp, v in data.items()
+            for other, combos in v["combinations"].items() for c in combos if c["isLatest"]}
+
+
+def load(k):
+    with ProcessPoolExecutor(1) as pool:
+        dataset = pool.submit(dataset_urls).result()
     pb = proto(download(PAIRS_URL))
     emojis = [m[1][0].decode() for m in sorted(map(proto, pb[1]), key=lambda m: m[2][0])]
     starts = [m[2][0] - 1 for m in map(proto, pb[3]) if m[1][0] != b"People"] + [len(emojis)]
@@ -188,8 +192,6 @@ def load(k):
     pairs = sorted(pairs)
     emojis = [emojis[g] for g in keep]
     order = ["-".join(f"{ord(c):x}" for c in e) for e in emojis]
-    dataset = {frozenset((cp, other)): c["gStaticUrl"] for cp, v in data.items()
-               for other, combos in v["combinations"].items() for c in combos if c["isLatest"]}
     dates = sorted({url.split("/")[-3] for url in dataset.values()}.union(GOOGLE_DATES), reverse=True)
     names = [frozenset((order[a], order[b])) for a, b in pairs]
     urls = [[dataset[s]] if s in dataset else [] for s in names]
