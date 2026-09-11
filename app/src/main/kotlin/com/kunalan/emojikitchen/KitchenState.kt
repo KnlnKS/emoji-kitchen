@@ -19,15 +19,15 @@ class KitchenState private constructor(
     initialB: Int,
     initialActive: Int,
     initialTab: Int,
-    initialExplore: Int,
+    initialPicked: Int,
 ) {
     private val picks = arrayOf(mutableIntStateOf(initialA), mutableIntStateOf(initialB))
     private val rolls = arrayOf(mutableIntStateOf(0), mutableIntStateOf(0))
+    private var picked by mutableIntStateOf(initialPicked)
+    private val fallback by lazy { randomEmoji() }
     var active by mutableIntStateOf(initialActive)
         private set
     var tab by mutableIntStateOf(initialTab)
-        private set
-    var explore by mutableIntStateOf(initialExplore)
         private set
     var checkPending by mutableStateOf(true)
         private set
@@ -39,10 +39,15 @@ class KitchenState private constructor(
     val b: Int get() = pick(1)
     val other: Int get() = pick(1 - active)
     val result: Int get() = if (a < 0 || b < 0) -1 else kitchen.item(a, b)
+    val explore: Int get() = if (picked >= 0) picked else if (a >= 0) a else if (b >= 0) b else fallback
+    val explored: Boolean get() = picked >= 0
 
-    val onTab: (Int) -> Unit = { t ->
-        if (t == Explore && explore < 0) explore = if (a >= 0) a else if (b >= 0) b else randomEmoji()
-        show(t)
+    val onSettle: (Int) -> Unit = { t ->
+        if (t == Explore) picked = explore
+        if (t != tab) {
+            tab = t
+            checkPending = true
+        }
     }
     val onChecked: () -> Unit = { checkPending = false }
     val onSelect: (Int) -> Unit = { active = it }
@@ -50,18 +55,14 @@ class KitchenState private constructor(
         picks[active].intValue = e
         if (other < 0) active = 1 - active
     }
-    val onExplore: (Int) -> Unit = { explore = it }
+    val onExplore: (Int) -> Unit = { picked = it }
     val onRoll: (Int) -> Unit = { slot ->
         active = slot
         picks[slot].intValue = partnerOf(other)
         rolls[slot].intValue++
     }
-    val onLoad: (Int) -> Unit = { item ->
-        val c = kitchen.combo(item)
-        val first = if (tab == Explore) explore else c.a
-        set(first, c.other(first))
-        show(Combine)
-    }
+    val onLoad: (Int) -> Unit = { item -> load(item, kitchen.combo(item).a) }
+    val onLoadExplored: (Int) -> Unit = { item -> load(item, explore) }
     val onRandomize: () -> Unit = {
         val e = randomEmoji()
         set(e, partnerOf(e))
@@ -71,15 +72,11 @@ class KitchenState private constructor(
         active = 0
     }
 
+    private fun load(item: Int, first: Int) = set(first, kitchen.combo(item).other(first))
+
     private fun set(first: Int, second: Int) {
         picks[0].intValue = first
         picks[1].intValue = second
-    }
-
-    private fun show(t: Int) {
-        if (t == tab) return
-        tab = t
-        checkPending = true
     }
 
     private fun randomEmoji(): Int {
@@ -95,7 +92,7 @@ class KitchenState private constructor(
 
     companion object {
         fun saver(kitchen: Kitchen) = Saver<KitchenState, IntArray>(
-            save = { intArrayOf(it.a, it.b, it.active, it.tab, it.explore) },
+            save = { intArrayOf(it.a, it.b, it.active, it.tab, it.picked) },
             restore = { KitchenState(kitchen, it[0], it[1], it[2], it[3], it[4]).apply { checkPending = false } },
         )
 

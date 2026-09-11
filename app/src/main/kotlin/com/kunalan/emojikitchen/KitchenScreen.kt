@@ -1,7 +1,11 @@
 package com.kunalan.emojikitchen
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,11 +20,16 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -37,9 +46,11 @@ import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.LocalKitchen
 import com.kunalan.emojikitchen.ui.Sections
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
+import kotlinx.coroutines.launch
 import com.kunalan.emojikitchen.ui.R as UiR
 
 internal val EmojiColumns = AtLeast(9, 40.dp)
+private val PageSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = 1f)
 
 @Composable
 fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
@@ -51,19 +62,32 @@ fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
     val titles = remember(names) { Array(names.size) { names[it].uppercase() } }
     val combineGrid = rememberLazyGridState()
     val exploreGrid = rememberLazyGridState()
+    val pager = remember(state) { PagerState(state.tab) { 2 } }
+    val scope = rememberCoroutineScope()
+    val go: (Int) -> Unit = remember(pager) { { page -> scope.launch { pager.glide(page) } } }
+    val loadExplored: (Int) -> Unit = remember(state, go) {
+        { item ->
+            state.onLoadExplored(item)
+            go(Combine)
+        }
+    }
+    LaunchedEffect(pager) { snapshotFlow { pager.settledPage }.collect { state.onSettle(it) } }
     Column(
         Modifier
             .fillMaxSize()
             .background(colors.surface)
             .safeDrawingPadding(),
     ) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (state.tab == Combine) {
-                CombineTab(state, sections, titles, combineGrid, keyboardSetup, onSetUpKeyboard)
-                Fade(combineGrid, colors.surface)
-            } else {
-                ExploreTab(state, sections, titles, exploreGrid)
-                Fade(exploreGrid, colors.surface)
+        TabBar(state, pager, go, Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp))
+        HorizontalPager(pager, Modifier.weight(1f), beyondViewportPageCount = if (state.explored) 1 else 0) { page ->
+            Box(Modifier.fillMaxSize()) {
+                if (page == Combine) {
+                    CombineTab(state, sections, titles, combineGrid, keyboardSetup, onSetUpKeyboard)
+                    Fade(combineGrid, colors.surface)
+                } else {
+                    ExploreTab(state, sections, titles, exploreGrid, loadExplored)
+                    Fade(exploreGrid, colors.surface)
+                }
             }
         }
         Label(
@@ -73,6 +97,14 @@ fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
             Modifier.align(Alignment.End).padding(top = 10.dp, end = 5.dp, bottom = 5.dp),
         )
     }
+}
+
+private suspend fun PagerState.glide(page: Int) = scroll(MutatePriority.UserInput) {
+    updateTargetPage(page)
+    val distance = (page - currentPage - currentPageOffsetFraction) * (layoutInfo.pageSize + layoutInfo.pageSpacing)
+    var done = 0f
+    animate(0f, distance, animationSpec = PageSpec) { value, _ -> done += scrollBy(value - done) }
+    scrollBy(distance - done)
 }
 
 @Composable
@@ -95,10 +127,9 @@ private fun CombineTab(
         columns = EmojiColumns,
         state = grid,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 3.dp, end = 16.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        item("tabs", FullSpan, "tabs") { TabBar(state, Modifier.padding(top = 16.dp, bottom = 11.dp)) }
         item("card", FullSpan, "card") {
             CombineCard(state, keyboardSetup, onSetUpKeyboard, Modifier.bleed(1.dp).padding(bottom = 15.dp))
         }

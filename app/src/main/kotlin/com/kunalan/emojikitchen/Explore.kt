@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.AtLeast
 import com.kunalan.emojikitchen.ui.ComboCell
 import com.kunalan.emojikitchen.ui.ComboContent
-import com.kunalan.emojikitchen.ui.FullSpan
 import com.kunalan.emojikitchen.ui.LocalKitchen
 import com.kunalan.emojikitchen.ui.Sections
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
@@ -33,7 +32,13 @@ private val TileShape = RoundedCornerShape(16.dp)
 private val TileColumns = AtLeast(5, 64.dp)
 
 @Composable
-internal fun ExploreTab(state: KitchenState, sections: Sections, titles: Array<String>, grid: LazyGridState) {
+internal fun ExploreTab(
+    state: KitchenState,
+    sections: Sections,
+    titles: Array<String>,
+    grid: LazyGridState,
+    onLoad: (Int) -> Unit,
+) {
     val kitchen = LocalKitchen.current
     val colors = KitchenTheme.colors
     val collapsed = rememberCollapsed()
@@ -45,13 +50,12 @@ internal fun ExploreTab(state: KitchenState, sections: Sections, titles: Array<S
             columns = TileColumns,
             state = grid,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 32.dp, end = 32.dp, bottom = 250.dp),
+            contentPadding = PaddingValues(start = 32.dp, top = 4.dp, end = 32.dp, bottom = 250.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            item("tabs", FullSpan, "tabs") { TabBar(state, Modifier.bleed(16.dp).padding(top = 16.dp, bottom = 8.dp)) }
             items(kitchen.partnerCount(e), key = { kitchen.partner(e, it) }, contentType = ComboContent) { k ->
-                ComboCell(kitchen.partnerItem(e, k), state.onLoad, shape = TileShape, imageScale = 0.78f)
+                ComboCell(kitchen.partnerItem(e, k), onLoad, shape = TileShape, imageScale = 0.78f)
             }
         }
         Box(

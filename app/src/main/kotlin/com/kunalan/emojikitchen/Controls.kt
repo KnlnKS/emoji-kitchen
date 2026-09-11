@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,8 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidPath
@@ -40,9 +46,11 @@ import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kunalan.emojikitchen.ui.KitchenIcon
@@ -69,7 +77,7 @@ internal fun Modifier.raised(shape: Shape, color: Color): Modifier =
     if (color.alpha == 0f) this else dropShadow(shape, Shadow(6.dp, color, offset = DpOffset(0.dp, 2.dp)))
 
 @Composable
-internal fun TabBar(state: KitchenState, modifier: Modifier = Modifier) {
+internal fun TabBar(state: KitchenState, pager: PagerState, onTab: (Int) -> Unit, modifier: Modifier = Modifier) {
     val colors = KitchenTheme.colors
     Row(
         modifier
@@ -78,12 +86,23 @@ internal fun TabBar(state: KitchenState, modifier: Modifier = Modifier) {
             .raised(CircleShape, colors.shadow)
             .clip(CircleShape)
             .background(colors.surface)
+            .drawBehind {
+                val line = 1.dp.toPx()
+                val segment = (size.width - 3 * line) / 2
+                val x = line + (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, 1f) * (segment + line)
+                drawRect(
+                    colors.selected,
+                    Offset(if (layoutDirection == LayoutDirection.Rtl) size.width - x - segment else x, line),
+                    Size(segment, size.height - 2 * line),
+                )
+            }
             .border(1.dp, colors.border, CircleShape)
-            .padding(1.dp),
+            .padding(1.dp)
+            .selectableGroup(),
     ) {
-        Segment(Combine, R.string.combine, KitchenIcons.Blender, state, Modifier.weight(1f))
+        Segment(Combine, R.string.combine, KitchenIcons.Blender, state, onTab, Modifier.weight(1f))
         Spacer(Modifier.fillMaxHeight().width(1.dp).background(colors.border))
-        Segment(Explore, R.string.explore, KitchenIcons.Explore, state, Modifier.weight(1f))
+        Segment(Explore, R.string.explore, KitchenIcons.Explore, state, onTab, Modifier.weight(1f))
     }
 }
 
@@ -91,15 +110,21 @@ private val IconFade = tween<Float>(50, delayMillis = 150)
 private val CheckSpec = tween<Float>(360, easing = CubicBezierEasing(0.32f, 0.6f, 0.46f, 0.75f))
 
 @Composable
-private fun Segment(index: Int, label: Int, icon: ImageVector, state: KitchenState, modifier: Modifier) {
+private fun Segment(
+    index: Int,
+    label: Int,
+    icon: ImageVector,
+    state: KitchenState,
+    onTab: (Int) -> Unit,
+    modifier: Modifier,
+) {
     val colors = KitchenTheme.colors
     val selected = state.tab == index
     val animate = state.checkPending
     Row(
         modifier
             .fillMaxHeight()
-            .background(if (selected) colors.selected else Color.Transparent)
-            .clickable { state.onTab(index) },
+            .selectable(selected, role = Role.Tab) { onTab(index) },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
