@@ -44,5 +44,6 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
   - `N..N+P-1` are combos, sorted by (low, high).
 - **Partner lists:** `partner(e,k)` and `partnerItem(e,k)` are ordered by partner id ascending, which is Google's order within sections. `item(a,b)` returns -1 when the pair doesn't exist.
 - **`Combo`** packs a pair as `low shl 16 or high`.
+- **Pack images:** items are raw AVIF `mdat` payloads (alpha, then color). The pack carries one container template and a per-item alpha length, and `PackIndex.read` rebuilds the AVIF in a thread-local buffer.
 - **Favorites and recents:** `Kitchen.favorites` and `Kitchen.recents` are snapshot-state lists shared by the app and the IME, which run in the same process.
 - **Compose:** components read `Kitchen` from `LocalKitchen` and colors from `KitchenTheme.colors`. Grid callbacks take `(Int) -> Unit`, so no lambda is allocated per cell.

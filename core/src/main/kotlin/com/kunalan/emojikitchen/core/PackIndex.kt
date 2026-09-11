@@ -20,6 +20,11 @@ open class PackIndex internal constructor(private val channel: FileChannel, priv
     private val adjPartner: ShortBuffer
     private val adjItem: IntBuffer
     private val itemStart: LongBuffer
+    private val alphaLen: ShortBuffer
+    private val template: ByteArray
+    private val colorOffsetField: Int
+    private val colorLengthField: Int
+    private val alphaLengthField: Int
     private val comboStart: IntArray
     private val buffers = ThreadLocal<ByteBuffer>()
 
@@ -29,7 +34,7 @@ open class PackIndex internal constructor(private val channel: FileChannel, priv
         val n = header.getInt(8)
         emojiCount = n
         pairCount = header.getInt(12)
-        val map = channel.map(FileChannel.MapMode.READ_ONLY, base, header.getInt(48) + (n + pairCount + 1) * 8L)
+        val map = channel.map(FileChannel.MapMode.READ_ONLY, base, header.getInt(56) + (n + pairCount + 1) * 8L)
 
         fun section(field: Int): ByteBuffer {
             val b = map.duplicate()
@@ -46,7 +51,13 @@ open class PackIndex internal constructor(private val channel: FileChannel, priv
         adjStart = section(36).asIntBuffer()
         adjPartner = section(40).asShortBuffer()
         adjItem = section(44).asIntBuffer()
-        itemStart = section(48).asLongBuffer()
+        alphaLen = section(48).asShortBuffer()
+        val layout = section(52).asIntBuffer()
+        colorOffsetField = layout[0]
+        colorLengthField = layout[1]
+        alphaLengthField = layout[2]
+        template = ByteArray(layout[3]).also { section(52).apply { position(16) }.get(it) }
+        itemStart = section(56).asLongBuffer()
         comboStart = IntArray(n + 1)
         comboStart[0] = n
         for (e in 0 until n) {
@@ -115,14 +126,21 @@ open class PackIndex internal constructor(private val channel: FileChannel, priv
     internal fun read(item: Int): ByteBuffer {
         val start = itemStart[item]
         val size = (itemStart[item + 1] - start).toInt()
+        val alpha = alphaLen[item].toInt() and 0xFFFF
+        val total = template.size + size
         var buf = buffers.get()
-        if (buf == null || buf.capacity() < size) {
-            buf = ByteBuffer.allocateDirect(Integer.highestOneBit(size) shl 1)
+        if (buf == null || buf.capacity() < total) {
+            buf = ByteBuffer.allocateDirect(Integer.highestOneBit(total) shl 1)
             buffers.set(buf)
         }
-        buf.range(0, size)
+        buf.range(0, total)
+        buf.put(template)
         readAt(buf, base + start)
-        buf.range(0, size)
+        buf.putInt(colorOffsetField, template.size + alpha)
+        buf.putInt(colorLengthField, size - alpha)
+        buf.putInt(alphaLengthField, alpha)
+        buf.putInt(template.size - 8, size + 8)
+        buf.range(0, total)
         return buf
     }
 
@@ -147,6 +165,6 @@ open class PackIndex internal constructor(private val channel: FileChannel, priv
     private companion object {
         const val HEADER = 64
         const val MAGIC = 0x4B504B45
-        const val VERSION = 2
+        const val VERSION = 3
     }
 }

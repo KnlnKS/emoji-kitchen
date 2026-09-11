@@ -32,8 +32,8 @@ GSTATIC_URL = "https://www.gstatic.com/android/keyboard/emojikitchen/{0}/{1}/{1}
 GOOGLE_DATES = ("20240612", "20241004", "20241113", "20250728", "20260428", "20260728")
 NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
 C = 7
-MAGIC, VERSION = 0x4B504B45, 2
-HEADER = struct.Struct("<IHH11I12x")
+MAGIC, VERSION = 0x4B504B45, 3
+HEADER = struct.Struct("<IHH13I4x")
 RETRIES = 3
 BATCH = 4096
 
@@ -212,9 +212,42 @@ def align8(n):
     return (n + 7) & ~7
 
 
+def container(path):
+    with open(path, "rb") as f:
+        head = f.read(512)
+    off = 0
+    while head[off + 4:off + 8] != b"mdat":
+        off += struct.unpack_from(">I", head, off)[0]
+    k = head.index(b"iloc") + 4
+    assert struct.unpack_from(">IBBH", head, k) == (0, 0x44, 0, 2)
+    color, alpha = struct.unpack_from(">HHHII", head, k + 8), struct.unpack_from(">HHHII", head, k + 22)
+    assert color[2] == alpha[2] == 1 and alpha[3] == off + 8 and color[3] == alpha[3] + alpha[4]
+    assert color[3] + color[4] == os.path.getsize(path) and alpha[4] < 2 ** 16
+    fields = (k + 14, k + 18, k + 32)
+    template = bytearray(head[:off + 8])
+    for i in (*fields, off):
+        template[i:i + 4] = bytes(4)
+    return bytes(template), fields, alpha[4], alpha[4] + color[4]
+
+
+def rebuild(template, fields, alpha, payload):
+    avif = bytearray(template)
+    for i, v in zip((*fields, len(template) - 8), (len(template) + alpha, len(payload) - alpha, alpha, len(payload) + 8)):
+        struct.pack_into(">I", avif, i, v)
+    return avif + payload
+
+
 def write_pack(path, emojis, cat_start, pairs, images):
     assert sys.byteorder == "little"
     n, p = len(emojis), len(pairs)
+    alpha_len, sizes = array("H"), []
+    for i in images:
+        head, fields, alpha, size = container(i)
+        if not sizes:
+            template, layout = head, fields
+        assert (head, fields) == (template, layout)
+        alpha_len.append(alpha)
+        sizes.append(size)
     rows = [[] for _ in range(n)]
     for item, ((lo, hi), _) in enumerate(pairs, n):
         rows[lo].append((hi, item))
@@ -225,14 +258,14 @@ def write_pack(path, emojis, cat_start, pairs, images):
     adj_start = array("i", accumulate((len(r) for r in rows), initial=0))
     partner = array("H", (b for r in rows for b, _ in r))
     adj_item = array("i", (i for r in rows for _, i in r))
-    sections = [blob, span, array("i", cat_start), adj_start, partner, adj_item]
+    sections = [blob, span, array("i", cat_start), adj_start, partner, adj_item, alpha_len,
+                struct.pack("<4I", *layout, len(template)) + template]
     offsets, off = [], HEADER.size
     for s in sections:
         off = align8(off)
         offsets.append(off)
         off += len(s) * (s.itemsize if isinstance(s, array) else 1)
     offsets.append(align8(off))
-    sizes = [os.path.getsize(i) for i in images]
     item_start = array("q", accumulate(sizes, initial=offsets[-1] + 8 * (len(sizes) + 1)))
     assert item_start[-1] < 2 ** 31
     sections.append(item_start)
@@ -243,7 +276,7 @@ def write_pack(path, emojis, cat_start, pairs, images):
             f.write(bytes(off - f.tell()))
             f.write(s)
         for i in images:
-            f.write(i.read_bytes())
+            f.write(memoryview(i.read_bytes())[len(template):])
         assert f.tell() == item_start[-1]
     os.replace(tmp, path)
     return len(partner)
@@ -254,9 +287,9 @@ def verify(path, emojis, p, a):
     with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
         magic, version, zero, hn, hp, ha, hc, *offs = HEADER.unpack_from(m)
         assert (magic, version, zero, hn, hp, ha, hc) == (MAGIC, VERSION, 0, n, p, a, C)
-        assert all(o % 8 == 0 for o in offs) and m[52:64] == bytes(12)
+        assert all(o % 8 == 0 for o in offs) and m[60:64] == bytes(4)
         read = lambda code, off, count: array(code, m[off:off + count * array(code).itemsize])
-        s_off, span_off, cat_off, adj_off, partner_off, item_off, start_off = offs
+        s_off, span_off, cat_off, adj_off, partner_off, item_off, alpha_off, template_off, start_off = offs
         span = read("i", span_off, n + 1)
         assert [m[s_off + span[e]:s_off + span[e + 1]].decode() for e in range(n)] == emojis
         cat = read("i", cat_off, C + 1)
@@ -272,13 +305,16 @@ def verify(path, emojis, p, a):
         assert [item for (e, b), item in sorted(edges.items()) if e <= b] == list(range(n, n + p))
         starts = read("q", start_off, n + p + 1)
         assert starts[0] == start_off + 8 * (n + p + 1) and starts[-1] == len(m)
-        for s in starts[:-1]:
-            assert m[s + 4:s + 12] == b"ftypavif"
+        alpha = read("H", alpha_off, n + p)
+        *fields, t = struct.unpack_from("<4I", m, template_off)
+        template = m[template_off + 16:template_off + 16 + t]
+        assert template[4:12] == b"ftypavif" and template[-4:] == b"mdat"
+        assert all(a < e - s for a, s, e in zip(alpha, starts, starts[1:]))
         with tempfile.NamedTemporaryFile(suffix=".avif", dir=OUT) as tmp:
             for i in random.sample(range(n + p), min(20, n + p)):
                 tmp.seek(0)
                 tmp.truncate()
-                tmp.write(m[starts[i]:starts[i + 1]])
+                tmp.write(rebuild(template, fields, alpha[i], m[starts[i]:starts[i + 1]]))
                 tmp.flush()
                 subprocess.run(["avifdec", "--info", tmp.name], check=True, capture_output=True)
         print(f"verified {path}: N={n} P={p} A={a} items={n + p} total={len(m) / 2 ** 20:.1f} MB "
