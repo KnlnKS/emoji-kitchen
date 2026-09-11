@@ -7,10 +7,12 @@ import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.currentValueOf
+import com.kunalan.emojikitchen.ui.theme.LocalKitchenColors
 import kotlinx.coroutines.launch
 
 object KitchenRipple : IndicationNodeFactory {
@@ -19,13 +21,13 @@ object KitchenRipple : IndicationNodeFactory {
     override fun hashCode(): Int = javaClass.hashCode()
 }
 
-private val RippleColor = Color(0xFFE8EAED)
 private val EaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private val Grow = tween<Float>(200, easing = EaseOut)
 private val FadeIn = tween<Float>(100, easing = EaseOut)
 private val FadeOut = tween<Float>(200, easing = EaseOut)
 
-private class RippleNode(private val source: InteractionSource) : Modifier.Node(), DrawModifierNode {
+private class RippleNode(private val source: InteractionSource) :
+    Modifier.Node(), DrawModifierNode, CompositionLocalConsumerModifierNode {
     private val scale = Animatable(0.4f)
     private val alpha = Animatable(0f)
 
@@ -45,7 +47,9 @@ private class RippleNode(private val source: InteractionSource) : Modifier.Node(
 
     override fun ContentDrawScope.draw() {
         val a = alpha.value
-        if (a > 0f) drawCircle(RippleColor, size.maxDimension * 0.71f * scale.value, alpha = a)
+        if (a > 0f) {
+            drawCircle(currentValueOf(LocalKitchenColors).ripple, size.maxDimension * 0.71f * scale.value, alpha = a)
+        }
         drawContent()
     }
 }

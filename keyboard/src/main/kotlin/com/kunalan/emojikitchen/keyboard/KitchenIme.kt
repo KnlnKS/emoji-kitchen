@@ -33,6 +33,7 @@ import com.kunalan.emojikitchen.core.ComboList
 import com.kunalan.emojikitchen.core.Kitchen
 import com.kunalan.emojikitchen.core.copyToClipboard
 import com.kunalan.emojikitchen.core.pngUri
+import com.kunalan.emojikitchen.ui.Sections
 import kotlinx.coroutines.launch
 
 class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
