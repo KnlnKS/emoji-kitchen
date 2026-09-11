@@ -31,7 +31,7 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
 | Module | Contents |
 |---|---|
 | `:core` | Pack reader (`Kitchen`), `Images`, `ComboList` (favorites and recents), `Share`. No UI. |
-| `:ui` | `theme/Tokens.kt` (Google widget tokens), `LocalKitchen`, `KitchenImage`, `EmojiCell`, `ComboCell`, `KitchenIcons`, the ripple indication |
+| `:ui` | `theme/Tokens.kt` (Google widget tokens, `KitchenFont`), `LocalKitchen`, `KitchenImage`, `EmojiCell`, `ComboCell`, `KitchenIcon(s)`, `KitchenRipple`, and the sectioned-grid primitives (`Sections`, `sectioned`, `AtLeast`, `Header`) |
 | `:app` | `MainActivity` and the widget-clone screen |
 | `:keyboard` | `KitchenIme` and the keyboard UI |
 | `:combopack` | Install-time Play Asset Delivery pack that ships `kitchen.pak` |
