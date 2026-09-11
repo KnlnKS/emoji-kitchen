@@ -16,7 +16,7 @@ import urllib.request
 from array import array
 from bisect import bisect_left
 from concurrent.futures import ThreadPoolExecutor
-from itertools import accumulate
+from itertools import accumulate, chain
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -24,6 +24,8 @@ EK_DATA = Path(os.environ.get("EK_DATA") or Path.home() / ".cache/emoji-kitchen"
 PNG, WEBP, OUT = EK_DATA / "png", EK_DATA / "webp", EK_DATA / "out"
 METADATA_URL = "https://raw.githubusercontent.com/xsalazar/emoji-kitchen-backend/main/app/metadata.json"
 PAIRS_URL = "https://www.google.com/logos/fnbx/emoji_kitchen/emoji_kitchen_pairs.13.pb"
+GSTATIC_URL = "https://www.gstatic.com/android/keyboard/emojikitchen/{0}/{1}/{1}_{2}.png"
+GOOGLE_DATES = ("20240612", "20241004", "20241113", "20250728", "20260428", "20260728")
 NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
 CWEBP = shutil.which("cwebp") or "/opt/homebrew/bin/cwebp"
 DWEBP = shutil.which("dwebp")
@@ -33,29 +35,43 @@ HEADER = struct.Struct("<IHH11I12x")
 RETRIES = 3
 
 
+def retry(request):
+    for attempt in range(RETRIES + 1):
+        try:
+            return request()
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            if attempt == RETRIES:
+                raise
+        except (urllib.error.URLError, OSError):
+            if attempt == RETRIES:
+                raise
+        time.sleep(2 ** attempt)
+
+
 def fetch(urls, dest):
     if dest.exists():
         return True
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
-    for url in urls:
-        for attempt in range(RETRIES + 1):
-            try:
-                req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip"})
-                with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
-                    shutil.copyfileobj(gzip.GzipFile(fileobj=r) if r.headers.get("Content-Encoding") == "gzip" else r, f)
-                os.replace(part, dest)
-                return True
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
-                    break
-                if attempt == RETRIES:
-                    raise
-            except (urllib.error.URLError, OSError):
-                if attempt == RETRIES:
-                    raise
-            time.sleep(2 ** attempt)
-    return False
+
+    def get(url):
+        req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip"})
+        with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
+            shutil.copyfileobj(gzip.GzipFile(fileobj=r) if r.headers.get("Content-Encoding") == "gzip" else r, f)
+        os.replace(part, dest)
+        return True
+
+    return any(retry(lambda: get(url)) for url in urls)
+
+
+def head(url):
+    def request():
+        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=60):
+            return True
+
+    return retry(request)
 
 
 def download(url):
@@ -128,6 +144,28 @@ def packed(b):
     return out
 
 
+def gstatic(a, b, dates):
+    u = lambda cp: "-".join("u" + x for x in cp.split("-"))
+    orders = dict.fromkeys(((u(a), u(b)), (u(b), u(a))))
+    return (GSTATIC_URL.format(d, x, y) for d in dates for x, y in orders)
+
+
+def probe(pairs, dates):
+    path = EK_DATA / "resolved-urls.json"
+    cache = json.loads(path.read_bytes()) if path.exists() else {}
+    keys = ["_".join(p) for p in pairs]
+    todo = [(key, p) for key, p in zip(keys, pairs) if key not in cache]
+    if todo:
+        with ThreadPoolExecutor(32) as pool:
+            found = list(pool.map(lambda p: next(filter(head, gstatic(*p, dates)), None), (p for _, p in todo)))
+        cache.update(zip((key for key, _ in todo), found))
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps(cache, indent=0, sort_keys=True))
+        os.replace(tmp, path)
+        print(f"probed {len(todo)} pairs: {len(found) - found.count(None)} found")
+    return [cache[key] for key in keys]
+
+
 def load(k):
     data = json.loads(download(METADATA_URL))["data"]
     pb = proto(download(PAIRS_URL))
@@ -145,13 +183,24 @@ def load(k):
     order = ["-".join(f"{ord(c):x}" for c in e) for e in emojis]
     dataset = {frozenset((cp, other)): c["gStaticUrl"] for cp, v in data.items()
                for other, combos in v["combinations"].items() for c in combos if c["isLatest"]}
+    google = {frozenset((c["left"], c["right"])): c["url"]
+              for c in json.loads((EK_DATA / "google-combos.json").read_bytes())}
+    dates = sorted({url.split("/")[-3] for url in dataset.values()}.union(GOOGLE_DATES), reverse=True)
     names = [frozenset((order[a], order[b])) for a, b in pairs]
+    urls = [[u for u in (dataset.get(s), google.get(s)) if u] for s in names]
+    todo = [i for i, u in enumerate(urls) if not u]
+    for i, url in zip(todo, probe([(order[pairs[i][0]], order[pairs[i][1]]) for i in todo], dates)):
+        if url:
+            urls[i].append(url)
+    unresolved = [(order[pairs[i][0]], order[pairs[i][1]]) for i in todo if not urls[i]]
     chosen, kept = set(order), set(names)
     removed = sorted(tuple(sorted(s)) for s in dataset if s <= chosen and s not in kept)
-    print(f"no dataset URL for {sum(s not in dataset for s in names)} pairs")
+    print(f"resolved: dataset={sum(s in dataset for s in names)} "
+          f"google-combos={sum(s in google and s not in dataset for s in names)} "
+          f"probed={len(todo) - len(unresolved)}/{len(todo)} unresolved={len(unresolved)} {unresolved}")
     print(f"removed {len(removed)} dataset pairs not in Google's set: {removed}")
-    resolved = [((a, b), (urlparse(dataset[s]).path.lstrip("/"), [dataset[s]]))
-                for (a, b), s in zip(pairs, names) if s in dataset]
+    resolved = [((a, b), (urlparse(u[0]).path.lstrip("/"), chain(u, gstatic(order[a], order[b], dates))))
+                for (a, b), u in zip(pairs, urls) if u]
     return order, emojis, [bisect_left(keep, s) for s in starts], resolved
 
 
