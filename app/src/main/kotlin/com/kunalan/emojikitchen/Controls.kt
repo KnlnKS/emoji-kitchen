@@ -81,9 +81,9 @@ internal fun TabBar(state: KitchenState, modifier: Modifier = Modifier) {
             .border(1.dp, colors.border, CircleShape)
             .padding(1.dp),
     ) {
-        Segment(0, R.string.combine, KitchenIcons.Blender, state, Modifier.weight(1f))
+        Segment(Combine, R.string.combine, KitchenIcons.Blender, state, Modifier.weight(1f))
         Spacer(Modifier.fillMaxHeight().width(1.dp).background(colors.border))
-        Segment(1, R.string.explore, KitchenIcons.Explore, state, Modifier.weight(1f))
+        Segment(Explore, R.string.explore, KitchenIcons.Explore, state, Modifier.weight(1f))
     }
 }
 

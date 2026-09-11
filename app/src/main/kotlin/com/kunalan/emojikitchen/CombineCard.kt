@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
@@ -56,7 +57,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val CardShape = RoundedCornerShape(16.dp)
-private val SlideSpec = tween<androidx.compose.ui.unit.Dp>(100, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f))
+private val SlideSpec = tween<Dp>(100, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f))
 private val DiceSpec = tween<Float>(600, easing = CubicBezierEasing(0.1f, 0.2f, 0.5f, 0.95f))
 private val RevealSpec = tween<Float>(350)
 private val IconSpec = tween<Float>(150)
@@ -72,10 +73,8 @@ internal fun CombineCard(
     val colors = KitchenTheme.colors
     val scope = rememberCoroutineScope()
     var copied by remember { mutableStateOf(false) }
-    val a = state.a
-    val b = state.b
     val result = state.result
-    val starred = result >= 0 && Combo.of(a, b) in kitchen.favorites
+    val starred = result >= 0 && Combo.of(state.a, state.b) in kitchen.favorites
     val copy: () -> Unit = remember(state) {
         {
             val item = state.result
@@ -107,9 +106,9 @@ internal fun CombineCard(
                     .background(colors.selected, CardShape),
             )
             Row {
-                Slot(0, a, state.rollA, R.string.randomize_first, state)
+                Slot(0, R.string.randomize_first, state)
                 Operator("+")
-                Slot(1, b, state.rollB, R.string.randomize_second, state)
+                Slot(1, R.string.randomize_second, state)
                 Operator("=")
                 Column(Modifier.width(90.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
@@ -148,8 +147,9 @@ internal fun CombineCard(
 }
 
 @Composable
-private fun Slot(slot: Int, e: Int, rolls: Int, description: Int, state: KitchenState) {
+private fun Slot(slot: Int, description: Int, state: KitchenState) {
     val kitchen = LocalKitchen.current
+    val e = state.pick(slot)
     val label = if (e >= 0) kitchen.emoji(e) else stringResource(R.string.no_emoji)
     Column(Modifier.width(90.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -161,7 +161,7 @@ private fun Slot(slot: Int, e: Int, rolls: Int, description: Int, state: Kitchen
         ) {
             if (e >= 0) KitchenImage(e, Modifier.fillMaxSize().padding(9.dp))
         }
-        Dice(slot, rolls, description, state.onRoll)
+        Dice(slot, state.rolls(slot), description, state.onRoll)
     }
 }
 
@@ -171,6 +171,13 @@ private fun Operator(symbol: String) {
         Label(symbol, OperatorText, KitchenTheme.colors.secondaryText, Modifier.wrapContentWidth(unbounded = true))
     }
 }
+
+private fun Modifier.circleButton(label: String, enabled: Boolean = true, onClick: () -> Unit): Modifier =
+    padding(top = 3.dp)
+        .height(38.dp)
+        .clip(CircleShape)
+        .semantics { contentDescription = label }
+        .clickable(enabled = enabled, onClick = onClick)
 
 @Composable
 private fun Dice(slot: Int, rolls: Int, description: Int, onRoll: (Int) -> Unit) {
@@ -183,18 +190,14 @@ private fun Dice(slot: Int, rolls: Int, description: Int, onRoll: (Int) -> Unit)
             spin.animateTo(1f, DiceSpec)
         }
     }
-    val label = stringResource(description)
     Box(
         Modifier
-            .padding(top = 3.dp)
-            .size(38.dp)
-            .clip(CircleShape)
+            .circleButton(stringResource(description)) { onRoll(slot) }
+            .width(38.dp)
             .drawBehind {
                 val p = spin.value
                 if (p < 1f) drawCircle(colors.ripple, alpha = 0.12f * (1f - p))
-            }
-            .semantics { contentDescription = label }
-            .clickable { onRoll(slot) },
+            },
         contentAlignment = Alignment.Center,
     ) {
         KitchenIcon(
@@ -217,18 +220,12 @@ private fun CopyButton(enabled: Boolean, copied: Boolean, onClick: () -> Unit) {
     val colors = KitchenTheme.colors
     val reveal = animateFloatAsState(if (copied) 1f else 0f, RevealSpec)
     val icon = animateFloatAsState(if (copied) 0f else if (enabled) 1f else 0.35f, IconSpec)
-    val label = stringResource(R.string.copy)
     Layout(
         content = {
             KitchenIcon(KitchenIcons.Copy, colors.secondaryText, Modifier.size(24.dp))
             Label(stringResource(R.string.copied), Caption, colors.secondaryText)
         },
-        modifier = Modifier
-            .padding(top = 3.dp)
-            .height(38.dp)
-            .clip(CircleShape)
-            .semantics { contentDescription = label }
-            .clickable(enabled = enabled, onClick = onClick),
+        modifier = Modifier.circleButton(stringResource(R.string.copy), enabled, onClick),
     ) { measurables, constraints ->
         val iconPlaceable = measurables[0].measure(Constraints())
         val textPlaceable = measurables[1].measure(Constraints())
@@ -248,14 +245,8 @@ private fun CopyButton(enabled: Boolean, copied: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun StarButton(starred: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val label = stringResource(R.string.favorite)
     Box(
-        Modifier
-            .padding(top = 3.dp)
-            .size(38.dp)
-            .clip(CircleShape)
-            .semantics { contentDescription = label }
-            .clickable(enabled = enabled, onClick = onClick),
+        Modifier.circleButton(stringResource(R.string.favorite), enabled, onClick).width(38.dp),
         contentAlignment = Alignment.Center,
     ) {
         KitchenIcon(

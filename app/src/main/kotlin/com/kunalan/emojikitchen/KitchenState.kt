@@ -6,9 +6,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
-import com.kunalan.emojikitchen.core.Combo
 import com.kunalan.emojikitchen.core.Kitchen
 import kotlin.random.Random
+
+internal const val Combine = 0
+internal const val Explore = 1
 
 @Stable
 class KitchenState private constructor(
@@ -19,69 +21,59 @@ class KitchenState private constructor(
     initialTab: Int,
     initialExplore: Int,
 ) {
-    var a by mutableIntStateOf(initialA)
-        private set
-    var b by mutableIntStateOf(initialB)
-        private set
+    private val picks = arrayOf(mutableIntStateOf(initialA), mutableIntStateOf(initialB))
+    private val rolls = arrayOf(mutableIntStateOf(0), mutableIntStateOf(0))
     var active by mutableIntStateOf(initialActive)
         private set
     var tab by mutableIntStateOf(initialTab)
         private set
     var explore by mutableIntStateOf(initialExplore)
         private set
-    var rollA by mutableIntStateOf(0)
-        private set
-    var rollB by mutableIntStateOf(0)
-        private set
     var checkPending by mutableStateOf(true)
         private set
 
+    fun pick(slot: Int): Int = picks[slot].intValue
+    fun rolls(slot: Int): Int = rolls[slot].intValue
+
+    val a: Int get() = pick(0)
+    val b: Int get() = pick(1)
+    val other: Int get() = pick(1 - active)
     val result: Int get() = if (a < 0 || b < 0) -1 else kitchen.item(a, b)
-    val other: Int get() = if (active == 0) b else a
 
     val onTab: (Int) -> Unit = { t ->
-        if (t == 1 && explore < 0) explore = if (a >= 0) a else if (b >= 0) b else randomEmoji()
+        if (t == Explore && explore < 0) explore = if (a >= 0) a else if (b >= 0) b else randomEmoji()
         show(t)
     }
     val onChecked: () -> Unit = { checkPending = false }
     val onSelect: (Int) -> Unit = { active = it }
-    val onPick: (Int) -> Unit = {
-        if (active == 0) {
-            a = it
-            if (b < 0) active = 1
-        } else {
-            b = it
-            if (a < 0) active = 0
-        }
+    val onPick: (Int) -> Unit = { e ->
+        picks[active].intValue = e
+        if (other < 0) active = 1 - active
     }
     val onExplore: (Int) -> Unit = { explore = it }
     val onRoll: (Int) -> Unit = { slot ->
         active = slot
-        val e = partnerOf(if (slot == 0) b else a)
-        if (slot == 0) {
-            a = e
-            rollA++
-        } else {
-            b = e
-            rollB++
-        }
+        picks[slot].intValue = partnerOf(other)
+        rolls[slot].intValue++
     }
     val onLoad: (Int) -> Unit = { item ->
-        val c = kitchen.pairOf(item)
-        val first = if (tab == 1 && c.b == explore) c.b else c.a
-        a = first
-        b = if (first == c.a) c.b else c.a
-        show(0)
+        val c = kitchen.combo(item)
+        val first = if (tab == Explore) explore else c.a
+        set(first, c.other(first))
+        show(Combine)
     }
     val onRandomize: () -> Unit = {
         val e = randomEmoji()
-        a = e
-        b = partnerOf(e)
+        set(e, partnerOf(e))
     }
     val onClear: () -> Unit = {
-        a = -1
-        b = -1
+        set(-1, -1)
         active = 0
+    }
+
+    private fun set(first: Int, second: Int) {
+        picks[0].intValue = first
+        picks[1].intValue = second
     }
 
     private fun show(t: Int) {
@@ -104,15 +96,9 @@ class KitchenState private constructor(
     companion object {
         fun saver(kitchen: Kitchen) = Saver<KitchenState, IntArray>(
             save = { intArrayOf(it.a, it.b, it.active, it.tab, it.explore) },
-            restore = {
-                val n = kitchen.emojiCount
-                fun valid(e: Int) = if (e < n) e else -1
-                KitchenState(kitchen, valid(it[0]), valid(it[1]), it[2], it[3], valid(it[4])).apply { checkPending = false }
-            },
+            restore = { KitchenState(kitchen, it[0], it[1], it[2], it[3], it[4]).apply { checkPending = false } },
         )
 
-        fun random(kitchen: Kitchen) = KitchenState(kitchen, -1, -1, 0, 0, -1).apply { onRandomize() }
+        fun random(kitchen: Kitchen) = KitchenState(kitchen, -1, -1, 0, Combine, -1).apply { onRandomize() }
     }
 }
-
-internal fun Kitchen.pairOf(item: Int): Combo = if (item < emojiCount) Combo.of(item, item) else combo(item)
