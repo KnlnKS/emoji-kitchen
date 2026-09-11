@@ -135,7 +135,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
         val items = list.items
         for (i in 0 until minOf(PREWARM, items.size)) {
             val item = k.itemOf(items[i])
-            if (item >= 0) lifecycleScope.launch { k.images.load(item) }
+            if (item >= 0 && k.images.peek(item) == null) lifecycleScope.launch { k.images.load(item) }
         }
     }
 
