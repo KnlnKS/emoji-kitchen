@@ -25,6 +25,6 @@ val miniPack = providers.environmentVariable("EK_DATA")
     .map { "$it/out/kitchen-mini.pak" }
 
 tasks.withType<Test>().configureEach {
-    inputs.file(miniPack).optional().withPathSensitivity(PathSensitivity.NONE).withPropertyName("miniPack")
+    inputs.files(miniPack).withPathSensitivity(PathSensitivity.NONE).withPropertyName("miniPack")
     systemProperty("ek.pack", miniPack.get())
 }
