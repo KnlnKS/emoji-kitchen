@@ -62,6 +62,7 @@ internal val PillText = TextStyle(fontFamily = KitchenFont, fontSize = 14.sp, li
 internal val OperatorText = TextStyle(fontFamily = KitchenFont, fontSize = 26.sp)
 internal val Caption = TextStyle(fontFamily = KitchenFont, fontSize = 13.sp)
 internal val Footnote = TextStyle(fontFamily = KitchenFont, fontSize = 11.sp)
+internal val Title = TextStyle(fontFamily = KitchenFont, fontSize = 32.sp)
 
 internal fun Modifier.raised(shape: Shape, color: Color): Modifier =
     if (color.alpha == 0f) this else dropShadow(shape, Shadow(6.dp, color, offset = DpOffset(0.dp, 2.dp)))

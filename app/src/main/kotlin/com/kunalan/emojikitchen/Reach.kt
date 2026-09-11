@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
 import androidx.compose.foundation.gestures.snapping.snapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,15 +23,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.FullSpan
+import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
 private val SnapSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
@@ -98,7 +103,7 @@ internal fun ReachPage(
                 horizontalArrangement = horizontal,
                 flingBehavior = fling,
             ) {
-                item("reach", FullSpan, "reach") { Gap(reach) }
+                item("reach", FullSpan, "reach") { Gap(reach, grid) }
                 content()
             }
             Fade(grid)
@@ -124,14 +129,29 @@ internal fun ReachPage(
 }
 
 @Composable
-private fun Gap(reach: Reach) {
-    Spacer(
+private fun Gap(reach: Reach, grid: LazyGridState) {
+    Box(
         Modifier.layout { measurable, constraints ->
             val height = reach.gap.roundToPx()
             val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
             layout(placeable.width, height) { placeable.place(0, 0) }
         },
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Label(
+            stringResource(R.string.app_name),
+            Title,
+            KitchenTheme.colors.primaryText,
+            Modifier.graphicsLayer {
+                val gap = reach.gap.toPx()
+                alpha = if (gap > 0f && grid.firstVisibleItemIndex == 0) {
+                    (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+            },
+        )
+    }
 }
 
 @Composable
