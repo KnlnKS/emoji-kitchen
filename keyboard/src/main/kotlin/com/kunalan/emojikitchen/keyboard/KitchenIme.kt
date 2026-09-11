@@ -169,8 +169,8 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     override fun onDestroy() {
-        registry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         super.onDestroy()
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
