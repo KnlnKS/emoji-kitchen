@@ -15,7 +15,6 @@ import time
 import urllib.error
 import urllib.request
 from array import array
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from itertools import accumulate
 from pathlib import Path
@@ -27,6 +26,7 @@ METADATA_URL = "https://raw.githubusercontent.com/xsalazar/emoji-kitchen-backend
 NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
 CWEBP = shutil.which("cwebp") or "/opt/homebrew/bin/cwebp"
 DWEBP = shutil.which("dwebp")
+ORDER = Path(__file__).with_name("google-order.txt")
 SECTION_NAMES = ["Smileys and emotions", "Animals and nature", "Food and drink", "Travel and places",
                  "Activities and events", "Objects", "Symbols"]
 SECTIONS = {"smileys & emotion": 0, "people & body": 0, "animals & nature": 1, "food & drink": 2,
@@ -97,16 +97,23 @@ def noto_urls(cp):
     return [fmt(stripped)] + ([fmt(parts)] if stripped != parts else [])
 
 
+def norm(cp):
+    return "-".join(p for p in (f"{int(x, 16):x}" for x in cp.split("-")) if p != "fe0f")
+
+
 def load(k):
     fetch([METADATA_URL], EK_DATA / "metadata.json")
     meta = json.loads((EK_DATA / "metadata.json").read_bytes())
     data, known = meta["data"], meta["knownSupportedEmoji"]
-    cats = {cp: data[cp].get("category") or "" for cp in known}
-    section = {cp: SECTIONS.get(html.unescape(c), 6) for cp, c in cats.items()}
-    print("category histogram:")
-    for cat, n in Counter(cats.values()).most_common():
-        print(f"  {n:4d}  {cat!r} -> {SECTION_NAMES[SECTIONS.get(html.unescape(cat), 6)]}")
-    order = sorted(known, key=lambda cp: (section[cp], data[cp]["gBoardOrder"], cp))
+    google = {norm(cp): (s, 0, i) for s, line in enumerate(ORDER.read_text().splitlines())
+              for i, cp in enumerate(line.split())}
+    rank = {cp: google.get(norm(cp)) or (SECTIONS.get(html.unescape(data[cp].get("category") or ""), 6), 1,
+                                         data[cp]["gBoardOrder"]) for cp in known}
+    fallback = [cp for cp in known if rank[cp][1]]
+    skipped = sorted(google.keys() - {norm(cp) for cp in known}, key=google.get)
+    print(f"google order: matched={len(known) - len(fallback)} fallback={len(fallback)} {fallback} "
+          f"skipped={len(skipped)} {skipped}")
+    order = sorted(known, key=lambda cp: (rank[cp], cp))
     if k and k < len(order):
         order = [order[i * len(order) // k] for i in range(k)]
     ids = {cp: i for i, cp in enumerate(order)}
@@ -119,7 +126,7 @@ def load(k):
                     pairs.setdefault(tuple(sorted((ids[cp], ids[other]))), url)
     cat_start = [0] * (C + 1)
     for cp in order:
-        cat_start[section[cp] + 1] += 1
+        cat_start[rank[cp][0] + 1] += 1
     return order, data, list(accumulate(cat_start)), sorted(pairs.items())
 
 
