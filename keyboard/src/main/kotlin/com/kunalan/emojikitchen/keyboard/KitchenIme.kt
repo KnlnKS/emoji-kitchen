@@ -48,11 +48,9 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
         private set
     internal val acceptsImages = mutableStateOf(true)
     internal val canSwitch = mutableStateOf(false)
-    internal var starTab by mutableStateOf(false)
+    internal var mode: Mode by mutableStateOf(Mode.Emoji)
         private set
     internal var star by mutableStateOf(StarItems(IntArray(0), IntArray(0)))
-        private set
-    internal var combo by mutableStateOf<ComboMode?>(null)
         private set
     internal val emojiGrid = LazyGridState()
     internal val comboGrid = LazyGridState()
@@ -66,26 +64,28 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     internal val onStar: () -> Unit = {
-        if (!starTab) {
+        if (mode !== Mode.Star) {
             snapshotStar()
-            starTab = true
+            mode = Mode.Star
         }
-        combo = null
     }
 
     internal val onSection: (Int) -> Unit = { s ->
-        starTab = false
-        val c = combo
-        if (c == null) emojiGrid.requestScrollToItem(emojiSections.jump(s))
-        else comboGrid.requestScrollToItem(c.sections.jump(s))
+        when (val m = mode) {
+            is Mode.Combo -> comboGrid.requestScrollToItem(m.sections.jump(s))
+            Mode.Star, Mode.Emoji -> {
+                mode = Mode.Emoji
+                emojiGrid.requestScrollToItem(emojiSections.jump(s))
+            }
+        }
     }
 
     internal val onEmoji: (Int) -> Unit = { e ->
-        combo = ComboMode(e, Sections(kitchen!!.partnerSectionStarts(e)))
+        mode = Mode.Combo(e, Sections(kitchen!!.partnerSectionStarts(e)))
         comboGrid.requestScrollToItem(0)
     }
 
-    internal val onBack: () -> Unit = { combo = null }
+    internal val onBack: () -> Unit = { back() }
 
     internal val onSend: (Int) -> Unit = { item ->
         val k = kitchen!!
@@ -122,7 +122,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
         val k = Kitchen.get(this) ?: return
         kitchen = k
         emojiSections = Sections(k.categoryStart)
-        starTab = k.favorites.items.isNotEmpty() || k.recents.items.isNotEmpty()
+        if (k.favorites.items.isNotEmpty() || k.recents.items.isNotEmpty()) mode = Mode.Star
         prewarm(k, k.favorites)
         prewarm(k, k.recents)
     }
@@ -156,7 +156,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
 
     override fun onWindowShown() {
         super.onWindowShown()
-        if (starTab) snapshotStar()
+        if (mode === Mode.Star) snapshotStar()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -170,8 +170,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode != KeyEvent.KEYCODE_BACK || combo == null) return super.onKeyDown(keyCode, event)
-        combo = null
+        if (keyCode != KeyEvent.KEYCODE_BACK || !back()) return super.onKeyDown(keyCode, event)
         backDown = true
         return true
     }
@@ -179,6 +178,12 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode != KeyEvent.KEYCODE_BACK || !backDown) return super.onKeyUp(keyCode, event)
         backDown = false
+        return true
+    }
+
+    private fun back(): Boolean {
+        if (mode !is Mode.Combo) return false
+        mode = Mode.Emoji
         return true
     }
 

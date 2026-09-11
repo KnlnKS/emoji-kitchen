@@ -64,8 +64,6 @@ import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 import com.kunalan.emojikitchen.ui.topLine
 import com.kunalan.emojikitchen.ui.R as UiR
 
-private const val STAR = -1
-
 private val EmojiColumns = AtLeast(8, 52.dp)
 private val ComboColumns = AtLeast(5, 84.dp)
 private val BannerStyle = TextStyle(fontFamily = KitchenFont, fontSize = 12.sp)
@@ -120,15 +118,14 @@ private fun Banner(ime: KitchenIme) {
 
 @Composable
 private fun ColumnScope.Content(ime: KitchenIme) {
-    val combo = ime.combo
     val fill = Modifier.fillMaxWidth().weight(1f)
-    when {
-        ime.starTab -> StarGrid(ime, fill)
-        combo != null -> {
-            ComboHeader(ime, combo.base)
-            ComboGrid(ime, combo, fill)
+    when (val mode = ime.mode) {
+        Mode.Star -> StarGrid(ime, fill)
+        Mode.Emoji -> EmojiGrid(ime, fill)
+        is Mode.Combo -> {
+            ComboHeader(ime, mode.base)
+            ComboGrid(ime, mode, fill)
         }
-        else -> EmojiGrid(ime, fill)
     }
 }
 
@@ -163,7 +160,7 @@ private fun EmojiGrid(ime: KitchenIme, modifier: Modifier) {
 }
 
 @Composable
-private fun ComboGrid(ime: KitchenIme, combo: ComboMode, modifier: Modifier) {
+private fun ComboGrid(ime: KitchenIme, combo: Mode.Combo, modifier: Modifier) {
     val kitchen = LocalKitchen.current
     val names = stringArrayResource(UiR.array.sections)
     LazyVerticalGrid(ComboColumns, modifier, ime.comboGrid) {
@@ -200,13 +197,12 @@ private fun ComboHeader(ime: KitchenIme, base: Int) {
 
 @Composable
 private fun Bar(ime: KitchenIme) {
-    val active by remember(ime) {
+    val section by remember(ime) {
         derivedStateOf {
-            val combo = ime.combo
-            when {
-                ime.starTab -> STAR
-                combo != null -> combo.sections.at(ime.comboGrid.firstVisibleItemIndex)
-                else -> ime.emojiSections.at(ime.emojiGrid.firstVisibleItemIndex)
+            when (val mode = ime.mode) {
+                Mode.Star -> null
+                Mode.Emoji -> ime.emojiSections.at(ime.emojiGrid.firstVisibleItemIndex)
+                is Mode.Combo -> mode.sections.at(ime.comboGrid.firstVisibleItemIndex)
             }
         }
     }
@@ -224,9 +220,9 @@ private fun Bar(ime: KitchenIme) {
                 Icon(KitchenIcons.Globe, stringResource(R.string.next_keyboard), colors.secondaryText)
             }
         }
-        Tab(KitchenIcons.Star, stringResource(R.string.favorites), active == STAR, ime.onStar)
+        Tab(KitchenIcons.Star, stringResource(R.string.favorites), section == null, ime.onStar)
         KitchenIcons.Sections.forEachIndexed { s, icon ->
-            Tab(icon, names[s], active == s) { ime.onSection(s) }
+            Tab(icon, names[s], section == s) { ime.onSection(s) }
         }
     }
 }
