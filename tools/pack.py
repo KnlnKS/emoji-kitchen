@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import gzip
-import html
 import json
 import mmap
 import os
@@ -15,6 +14,7 @@ import time
 import urllib.error
 import urllib.request
 from array import array
+from bisect import bisect_left
 from concurrent.futures import ThreadPoolExecutor
 from itertools import accumulate
 from pathlib import Path
@@ -23,12 +23,10 @@ from urllib.parse import urlparse
 EK_DATA = Path(os.environ.get("EK_DATA") or Path.home() / ".cache/emoji-kitchen")
 PNG, WEBP, OUT = EK_DATA / "png", EK_DATA / "webp", EK_DATA / "out"
 METADATA_URL = "https://raw.githubusercontent.com/xsalazar/emoji-kitchen-backend/main/app/metadata.json"
+PAIRS_URL = "https://www.google.com/logos/fnbx/emoji_kitchen/emoji_kitchen_pairs.13.pb"
 NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
 CWEBP = shutil.which("cwebp") or "/opt/homebrew/bin/cwebp"
 DWEBP = shutil.which("dwebp")
-ORDER = Path(__file__).with_name("google-order.txt")
-SECTIONS = {"smileys & emotion": 0, "people & body": 0, "animals & nature": 1, "food & drink": 2,
-            "travel & places": 3, "activities": 4, "objects": 5}
 C = 7
 MAGIC, VERSION = 0x4B504B45, 1
 HEADER = struct.Struct("<IHH11I12x")
@@ -58,6 +56,12 @@ def fetch(urls, dest):
                     raise
             time.sleep(2 ** attempt)
     return False
+
+
+def download(url):
+    dest = EK_DATA / url.rsplit("/", 1)[1]
+    fetch([url], dest)
+    return dest.read_bytes()
 
 
 def encode(src, dest):
@@ -95,37 +99,60 @@ def noto_urls(cp):
     return [fmt(stripped)] + ([fmt(parts)] if stripped != parts else [])
 
 
-def norm(cp):
-    return "-".join(p for p in (f"{int(x, 16):x}" for x in cp.split("-")) if p != "fe0f")
+def varint(b, i):
+    n = s = 0
+    while b[i] & 0x80:
+        n |= (b[i] & 0x7F) << s
+        i, s = i + 1, s + 7
+    return n | b[i] << s, i + 1
+
+
+def proto(b):
+    fields, i = {}, 0
+    while i < len(b):
+        key, i = varint(b, i)
+        if key & 7 == 2:
+            n, i = varint(b, i)
+            v, i = b[i:i + n], i + n
+        else:
+            v, i = varint(b, i)
+        fields.setdefault(key >> 3, []).append(v)
+    return fields
+
+
+def packed(b):
+    out, i = [], 0
+    while i < len(b):
+        v, i = varint(b, i)
+        out.append(v)
+    return out
 
 
 def load(k):
-    fetch([METADATA_URL], EK_DATA / "metadata.json")
-    meta = json.loads((EK_DATA / "metadata.json").read_bytes())
-    data, known = meta["data"], meta["knownSupportedEmoji"]
-    google = {norm(cp): (s, 0, i) for s, line in enumerate(ORDER.read_text().splitlines())
-              for i, cp in enumerate(line.split())}
-    rank = {cp: google.get(norm(cp)) or (SECTIONS.get(html.unescape(data[cp].get("category") or ""), 6), 1,
-                                         data[cp]["gBoardOrder"]) for cp in known}
-    fallback = [cp for cp in known if rank[cp][1]]
-    skipped = sorted(google.keys() - {norm(cp) for cp in known}, key=google.get)
-    print(f"google order: matched={len(known) - len(fallback)} fallback={len(fallback)} {fallback} "
-          f"skipped={len(skipped)} {skipped}")
-    order = sorted(known, key=lambda cp: (rank[cp], cp))
-    if k and k < len(order):
-        order = [order[i * len(order) // k] for i in range(k)]
-    ids = {cp: i for i, cp in enumerate(order)}
-    pairs = {}
-    for cp in order:
-        for other, combos in data[cp]["combinations"].items():
-            if other in ids:
-                url = next((c["gStaticUrl"] for c in combos if c["isLatest"]), None)
-                if url:
-                    pairs.setdefault(tuple(sorted((ids[cp], ids[other]))), url)
-    cat_start = [0] * (C + 1)
-    for cp in order:
-        cat_start[rank[cp][0] + 1] += 1
-    return order, data, list(accumulate(cat_start)), sorted(pairs.items())
+    data = json.loads(download(METADATA_URL))["data"]
+    pb = proto(download(PAIRS_URL))
+    emojis = [m[1][0].decode() for m in sorted(map(proto, pb[1]), key=lambda m: m[2][0])]
+    starts = [m[2][0] - 1 for m in map(proto, pb[3]) if m[1][0] != b"People"] + [len(emojis)]
+    keep = range(len(emojis)) if not k or k >= len(emojis) else [i * len(emojis) // k for i in range(k)]
+    ids = {g + 1: i for i, g in enumerate(keep)}
+    pairs = set()
+    for m in map(proto, pb[2]):
+        if m[1][0] in ids:
+            a = ids[m[1][0]]
+            pairs.update((min(a, ids[p]), max(a, ids[p])) for p in packed(m[2][0]) if p in ids)
+    pairs = sorted(pairs)
+    emojis = [emojis[g] for g in keep]
+    order = ["-".join(f"{ord(c):x}" for c in e) for e in emojis]
+    dataset = {frozenset((cp, other)): c["gStaticUrl"] for cp, v in data.items()
+               for other, combos in v["combinations"].items() for c in combos if c["isLatest"]}
+    names = [frozenset((order[a], order[b])) for a, b in pairs]
+    chosen, kept = set(order), set(names)
+    removed = sorted(tuple(sorted(s)) for s in dataset if s <= chosen and s not in kept)
+    print(f"no dataset URL for {sum(s not in dataset for s in names)} pairs")
+    print(f"removed {len(removed)} dataset pairs not in Google's set: {removed}")
+    resolved = [((a, b), (urlparse(dataset[s]).path.lstrip("/"), [dataset[s]]))
+                for (a, b), s in zip(pairs, names) if s in dataset]
+    return order, emojis, [bisect_left(keep, s) for s in starts], resolved
 
 
 def align8(n):
@@ -214,10 +241,10 @@ def main():
     args = ap.parse_args()
     out = OUT / (args.out or ("kitchen-mini.pak" if args.emoji else "kitchen.pak"))
     OUT.mkdir(parents=True, exist_ok=True)
-    order, data, cat_start, pairs = load(args.emoji)
+    order, emojis, cat_start, pairs = load(args.emoji)
     print(f"emoji={len(order)} pairs={len(pairs)} catStart={cat_start}")
     jobs = [(f"noto/{cp}.png", noto_urls(cp)) for cp in order]
-    jobs += [(urlparse(url).path.lstrip("/"), [url]) for _, url in pairs]
+    jobs += [job for _, job in pairs]
     webps = build_images(jobs)
     missing = [cp for cp, w in zip(order, webps) if not w]
     if missing:
@@ -225,7 +252,6 @@ def main():
     kept = [(pair, w) for pair, w in zip(pairs, webps[len(order):]) if w]
     if len(kept) != len(pairs):
         print(f"dropped {len(pairs) - len(kept)} combos with 404 gStaticUrl")
-    emojis = [data[cp]["emoji"] for cp in order]
     a = write_pack(out, emojis, cat_start, [pair for pair, _ in kept], webps[:len(order)] + [w for _, w in kept])
     verify(out, emojis, len(kept), a)
 
