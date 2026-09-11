@@ -16,6 +16,7 @@ dependencies {
     api(libs.core.ktx)
     api(libs.coroutines.android)
     implementation(libs.collection)
+    implementation(libs.avif)
     testImplementation(libs.junit)
 }
 

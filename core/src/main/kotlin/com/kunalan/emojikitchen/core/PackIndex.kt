@@ -147,6 +147,6 @@ open class PackIndex internal constructor(private val channel: FileChannel, priv
     private companion object {
         const val HEADER = 64
         const val MAGIC = 0x4B504B45
-        const val VERSION = 1
+        const val VERSION = 2
     }
 }

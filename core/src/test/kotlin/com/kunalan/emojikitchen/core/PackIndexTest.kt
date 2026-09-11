@@ -41,8 +41,7 @@ class PackIndexTest {
             assertEquals(2 * pack.pairCount - selfPairs, entries)
             for (item in intArrayOf(0, n, n + pack.pairCount - 1)) {
                 val head = ByteArray(12).also { pack.read(item).duplicate().get(it) }
-                assertEquals("RIFF", String(head, 0, 4))
-                assertEquals("WEBP", String(head, 8, 4))
+                assertEquals("ftypavif", String(head, 4, 8))
             }
         }
     }

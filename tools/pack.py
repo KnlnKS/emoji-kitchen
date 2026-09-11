@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --no-project --with pillow python3
 import argparse
 import gzip
 import html
+import io
 import json
 import mmap
 import os
@@ -20,17 +21,20 @@ from itertools import accumulate
 from pathlib import Path
 from urllib.parse import urlparse
 
+from PIL import Image
+
+SIZE, QUALITY, ALPHA_QUALITY = 256, 30, 55
 EK_DATA = Path(os.environ.get("EK_DATA") or Path.home() / ".cache/emoji-kitchen")
-PNG, WEBP, OUT = EK_DATA / "png", EK_DATA / "webp", EK_DATA / "out"
+PNG, AVIF, OUT = EK_DATA / "png", EK_DATA / f"avif{SIZE}q{QUALITY}a{ALPHA_QUALITY}", EK_DATA / "out"
 METADATA_URL = "https://raw.githubusercontent.com/xsalazar/emoji-kitchen-backend/main/app/metadata.json"
 NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
-CWEBP = shutil.which("cwebp") or "/opt/homebrew/bin/cwebp"
-DWEBP = shutil.which("dwebp")
+AVIFENC = shutil.which("avifenc") or "/opt/homebrew/bin/avifenc"
+AVIFDEC = shutil.which("avifdec")
 ORDER = Path(__file__).with_name("google-order.txt")
 SECTIONS = {"smileys & emotion": 0, "people & body": 0, "animals & nature": 1, "food & drink": 2,
             "travel & places": 3, "activities": 4, "objects": 5}
 C = 7
-MAGIC, VERSION = 0x4B504B45, 1
+MAGIC, VERSION = 0x4B504B45, 2
 HEADER = struct.Struct("<IHH11I12x")
 RETRIES = 3
 
@@ -62,19 +66,22 @@ def fetch(urls, dest):
 
 def encode(src, dest):
     if not dest.exists():
-        part = dest.with_name(dest.name + ".part")
-        subprocess.run([CWEBP, "-quiet", "-m", "6", "-q", "75", "-alpha_q", "80", "-resize", "256", "256",
-                        str(src), "-o", str(part)], check=True)
+        png = io.BytesIO()
+        Image.open(src).convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS).save(png, "PNG", compress_level=0)
+        part = dest.with_suffix(".part.avif")
+        subprocess.run([AVIFENC, "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
+                        "--qalpha", str(ALPHA_QUALITY), "-y", "444", str(part)],
+                       input=png.getvalue(), check=True, capture_output=True)
         os.replace(part, dest)
     return dest
 
 
 def build_images(jobs):
     def job(rel, urls):
-        png, webp = PNG / rel, WEBP / f"{rel}.webp"
-        webp.parent.mkdir(parents=True, exist_ok=True)
-        if webp.exists() or fetch(urls, png):
-            return enc.submit(encode, png, webp)
+        png, avif = PNG / rel, AVIF / f"{rel}.avif"
+        avif.parent.mkdir(parents=True, exist_ok=True)
+        if avif.exists() or fetch(urls, png):
+            return enc.submit(encode, png, avif)
         return None
 
     start, out = time.monotonic(), []
@@ -132,7 +139,7 @@ def align8(n):
     return (n + 7) & ~7
 
 
-def write_pack(path, emojis, cat_start, pairs, webps):
+def write_pack(path, emojis, cat_start, pairs, images):
     assert sys.byteorder == "little"
     n, p = len(emojis), len(pairs)
     rows = [[] for _ in range(n)]
@@ -152,7 +159,7 @@ def write_pack(path, emojis, cat_start, pairs, webps):
         offsets.append(off)
         off += len(s) * (s.itemsize if isinstance(s, array) else 1)
     offsets.append(align8(off))
-    sizes = [os.path.getsize(w) for w in webps]
+    sizes = [os.path.getsize(i) for i in images]
     item_start = array("q", accumulate(sizes, initial=offsets[-1] + 8 * (len(sizes) + 1)))
     assert item_start[-1] < 2 ** 31
     sections.append(item_start)
@@ -162,8 +169,8 @@ def write_pack(path, emojis, cat_start, pairs, webps):
         for off, s in zip(offsets, sections):
             f.write(bytes(off - f.tell()))
             f.write(s)
-        for w in webps:
-            f.write(w.read_bytes())
+        for i in images:
+            f.write(i.read_bytes())
         assert f.tell() == item_start[-1]
     os.replace(tmp, path)
     return len(partner)
@@ -192,18 +199,18 @@ def verify(path, emojis, p, a):
         assert [item for (e, b), item in sorted(edges.items()) if e <= b] == list(range(n, n + p))
         starts = read("q", start_off, n + p + 1)
         assert starts[0] == start_off + 8 * (n + p + 1) and starts[-1] == len(m)
-        for s, t in zip(starts, starts[1:]):
-            assert m[s:s + 4] == b"RIFF" and m[s + 8:s + 12] == b"WEBP" and struct.unpack_from("<I", m, s + 4)[0] + 8 == t - s
-        if DWEBP:
-            with tempfile.NamedTemporaryFile(suffix=".webp", dir=OUT) as tmp:
+        for s in starts[:-1]:
+            assert m[s + 4:s + 12] == b"ftypavif"
+        if AVIFDEC:
+            with tempfile.NamedTemporaryFile(suffix=".avif", dir=OUT) as tmp:
                 for i in random.sample(range(n + p), min(20, n + p)):
                     tmp.seek(0)
                     tmp.truncate()
                     tmp.write(m[starts[i]:starts[i + 1]])
                     tmp.flush()
-                    subprocess.run([DWEBP, "-quiet", tmp.name, "-o", "/dev/null"], check=True)
+                    subprocess.run([AVIFDEC, "--info", tmp.name], check=True, capture_output=True)
         print(f"verified {path}: N={n} P={p} A={a} items={n + p} total={len(m) / 2 ** 20:.1f} MB "
-          f"avg={(starts[-1] - starts[0]) / (n + p) / 1024:.1f} KB/item dwebp={'20 ok' if DWEBP else 'skipped'}")
+              f"avg={(starts[-1] - starts[0]) / (n + p) / 1024:.1f} KB/item avifdec={'20 ok' if AVIFDEC else 'skipped'}")
 
 
 def main():
@@ -218,15 +225,15 @@ def main():
     print(f"emoji={len(order)} pairs={len(pairs)} catStart={cat_start}")
     jobs = [(f"noto/{cp}.png", noto_urls(cp)) for cp in order]
     jobs += [(urlparse(url).path.lstrip("/"), [url]) for _, url in pairs]
-    webps = build_images(jobs)
-    missing = [cp for cp, w in zip(order, webps) if not w]
+    images = build_images(jobs)
+    missing = [cp for cp, i in zip(order, images) if not i]
     if missing:
         sys.exit(f"no Noto image for: {missing}")
-    kept = [(pair, w) for pair, w in zip(pairs, webps[len(order):]) if w]
+    kept = [(pair, i) for pair, i in zip(pairs, images[len(order):]) if i]
     if len(kept) != len(pairs):
         print(f"dropped {len(pairs) - len(kept)} combos with 404 gStaticUrl")
     emojis = [data[cp]["emoji"] for cp in order]
-    a = write_pack(out, emojis, cat_start, [pair for pair, _ in kept], webps[:len(order)] + [w for _, w in kept])
+    a = write_pack(out, emojis, cat_start, [pair for pair, _ in kept], images[:len(order)] + [i for _, i in kept])
     verify(out, emojis, len(kept), a)
 
 

@@ -3,7 +3,6 @@ package com.kunalan.emojikitchen.core
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
@@ -17,10 +16,8 @@ suspend fun Kitchen.pngUri(item: Int): Uri = withContext(Dispatchers.IO) {
     val file = File(dir, "$item.png")
     if (!file.isFile) {
         dir.mkdirs()
-        val bitmap = images.decode(item, ImageDecoder.ALLOCATOR_SOFTWARE)
         val tmp = File.createTempFile("share", null, dir)
-        tmp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
+        tmp.outputStream().use { out -> images.decode(item) { it.compress(Bitmap.CompressFormat.PNG, 100, out) } }
         tmp.renameTo(file)
     }
     FileProvider.getUriForFile(context, "${context.packageName}.share", file)
