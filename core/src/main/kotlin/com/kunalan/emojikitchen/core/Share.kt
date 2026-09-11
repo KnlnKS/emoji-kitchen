@@ -13,7 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 suspend fun Kitchen.pngUri(item: Int): Uri = withContext(Dispatchers.IO) {
-    val dir = File(context.cacheDir, "share")
+    val dir = File(context.cacheDir, "share/${pack.size}")
     val file = File(dir, "$item.png")
     if (!file.isFile) {
         dir.mkdirs()

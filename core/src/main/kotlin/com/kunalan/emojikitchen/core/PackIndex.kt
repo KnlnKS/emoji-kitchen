@@ -58,6 +58,8 @@ internal class PackIndex(private val channel: FileChannel, private val base: Lon
         }
     }
 
+    val size: Long get() = itemStart[emojiCount + pairCount]
+
     fun emoji(e: Int): String = emojis[e]
 
     fun indexOf(emoji: String): Int = ids.getOrDefault(emoji, -1)
