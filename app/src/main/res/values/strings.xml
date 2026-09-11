@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Emoji Kitchen</string>
+    <string name="combine">Combine</string>
+    <string name="explore">Explore</string>
+    <string name="randomize">Randomize</string>
+    <string name="clear_all">Clear all</string>
+    <string name="randomize_first">Randomize first emoji</string>
+    <string name="randomize_second">Randomize second emoji</string>
+    <string name="no_emoji">No emoji selected</string>
+    <string name="copy">Copy image</string>
+    <string name="copied">Copied</string>
+    <string name="favorite">Favorite</string>
+    <string name="favorites">Favorites</string>
+    <string name="set_up_keyboard">Set up keyboard</string>
+    <string name="footer">Emoji @ Google</string>
+    <string name="pack_missing">The emoji data is missing. Reinstall Emoji Kitchen to download it again.</string>
 </resources>
