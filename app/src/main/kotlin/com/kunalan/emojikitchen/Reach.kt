@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -23,17 +24,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.FullSpan
-import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
 @Stable
@@ -126,6 +132,9 @@ internal fun ReachPage(
 
 @Composable
 private fun Gap(reach: Reach, grid: LazyGridState) {
+    val name = stringResource(R.string.app_name)
+    val color = colorResource(R.color.logo)
+    val logo = painterResource(R.drawable.ic_launcher_foreground)
     Box(
         Modifier.layout { measurable, constraints ->
             val height = reach.gap.roundToPx()
@@ -134,14 +143,18 @@ private fun Gap(reach: Reach, grid: LazyGridState) {
         },
         contentAlignment = Alignment.Center,
     ) {
-        Label(
-            stringResource(R.string.app_name),
-            Title,
-            KitchenTheme.colors.primaryText,
-            Modifier.graphicsLayer {
-                val gap = reach.gap.toPx()
-                alpha = if (gap > 0f) (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f) else 0f
-            },
+        Spacer(
+            Modifier
+                .requiredSize(72.dp)
+                .graphicsLayer {
+                    val gap = reach.gap.toPx()
+                    alpha = if (gap > 0f) (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f) else 0f
+                }
+                .semantics { contentDescription = name }
+                .drawBehind {
+                    drawCircle(color)
+                    translate(-size.width / 4, -size.height / 4) { with(logo) { draw(size * 1.5f) } }
+                },
         )
     }
 }
