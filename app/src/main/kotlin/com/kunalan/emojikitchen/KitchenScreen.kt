@@ -84,7 +84,6 @@ private suspend fun PagerState.glide(page: Int) = scroll(MutatePriority.UserInpu
     val distance = (page - currentPage - currentPageOffsetFraction) * (layoutInfo.pageSize + layoutInfo.pageSpacing)
     var done = 0f
     animate(0f, distance, animationSpec = SettleSpec) { value, _ -> done += scrollBy(value - done) }
-    scrollBy(distance - done)
 }
 
 @Composable

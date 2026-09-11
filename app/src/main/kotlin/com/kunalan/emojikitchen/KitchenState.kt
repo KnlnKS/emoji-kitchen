@@ -61,8 +61,14 @@ class KitchenState private constructor(
         picks[slot].intValue = partnerOf(other)
         rolls[slot].intValue++
     }
-    val onLoad: (Int) -> Unit = { item -> load(item, kitchen.combo(item).a) }
-    val onLoadExplored: (Int) -> Unit = { item -> load(item, explore) }
+    val onLoad: (Int) -> Unit = { item ->
+        val c = kitchen.combo(item)
+        set(c.a, c.b)
+    }
+    val onLoadExplored: (Int) -> Unit = { item ->
+        val e = explore
+        set(e, kitchen.combo(item).other(e))
+    }
     val onRandomize: () -> Unit = {
         val e = randomEmoji()
         set(e, partnerOf(e))
@@ -71,8 +77,6 @@ class KitchenState private constructor(
         set(-1, -1)
         active = 0
     }
-
-    private fun load(item: Int, first: Int) = set(first, kitchen.combo(item).other(first))
 
     private fun set(first: Int, second: Int) {
         picks[0].intValue = first

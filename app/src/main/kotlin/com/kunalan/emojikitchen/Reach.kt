@@ -70,7 +70,7 @@ private class Reach(private val side: Dp, private val grid: LazyGridState) : Pad
 
     private fun span(): Float {
         val info = grid.layoutInfo
-        return (info.visibleItemsInfo.firstOrNull()?.size?.height ?: 0) + info.mainAxisItemSpacing.toFloat()
+        return (info.visibleItemsInfo[0].size.height + info.mainAxisItemSpacing).toFloat()
     }
 }
 
@@ -140,11 +140,7 @@ private fun Gap(reach: Reach, grid: LazyGridState) {
             KitchenTheme.colors.primaryText,
             Modifier.graphicsLayer {
                 val gap = reach.gap.toPx()
-                alpha = if (gap > 0f && grid.firstVisibleItemIndex == 0) {
-                    (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
+                alpha = if (gap > 0f) (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f) else 0f
             },
         )
     }
