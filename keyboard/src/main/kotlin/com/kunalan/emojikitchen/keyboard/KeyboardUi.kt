@@ -1,7 +1,6 @@
 package com.kunalan.emojikitchen.keyboard
 
 import android.content.res.Configuration
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -41,13 +40,14 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,9 +58,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kunalan.emojikitchen.ui.ComboCell
 import com.kunalan.emojikitchen.ui.EmojiCell
+import com.kunalan.emojikitchen.ui.KitchenIcon
 import com.kunalan.emojikitchen.ui.KitchenIcons
 import com.kunalan.emojikitchen.ui.KitchenImage
 import com.kunalan.emojikitchen.ui.LocalKitchen
+import com.kunalan.emojikitchen.ui.theme.KitchenFont
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 import com.kunalan.emojikitchen.ui.R as UiR
 
@@ -120,7 +122,7 @@ private fun Banner(ime: KitchenIme) {
     ) {
         BasicText(
             stringResource(R.string.no_images),
-            style = TextStyle(color = colors.secondaryText, fontSize = 12.sp),
+            style = TextStyle(color = colors.secondaryText, fontSize = 12.sp, fontFamily = KitchenFont),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -220,7 +222,7 @@ private fun ComboHeader(ime: KitchenIme, base: Int) {
         BasicText(
             "+",
             Modifier.padding(start = 8.dp),
-            style = TextStyle(color = colors.secondaryText, fontSize = 20.sp),
+            style = TextStyle(color = colors.secondaryText, fontSize = 20.sp, fontFamily = KitchenFont),
         )
     }
 }
@@ -279,7 +281,7 @@ private fun RowScope.Tab(icon: ImageVector, label: String, active: Boolean, onCl
 
 @Composable
 private fun Icon(icon: ImageVector, label: String, tint: Color) {
-    Image(icon, label, Modifier.size(22.dp), colorFilter = ColorFilter.tint(tint))
+    KitchenIcon(icon, tint, Modifier.size(22.dp).semantics { contentDescription = label })
 }
 
 @Composable
@@ -287,7 +289,12 @@ private fun Header(text: String) {
     BasicText(
         text,
         Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 12.dp).wrapContentHeight(Alignment.CenterVertically),
-        style = TextStyle(color = KitchenTheme.colors.secondaryText, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+        style = TextStyle(
+            color = KitchenTheme.colors.secondaryText,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = KitchenFont,
+        ),
         maxLines = 1,
     )
 }
@@ -298,7 +305,12 @@ private fun Centered(text: String, modifier: Modifier) {
         BasicText(
             text,
             Modifier.padding(horizontal = 16.dp),
-            style = TextStyle(color = KitchenTheme.colors.secondaryText, fontSize = 14.sp, textAlign = TextAlign.Center),
+            style = TextStyle(
+                color = KitchenTheme.colors.secondaryText,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = KitchenFont,
+            ),
         )
     }
 }
