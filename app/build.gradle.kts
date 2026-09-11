@@ -18,6 +18,9 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
     buildTypes {
         release {
@@ -36,6 +39,9 @@ android {
     }
     androidResources {
         noCompress += "pak"
+    }
+    packaging {
+        resources.excludes += setOf("kotlin/**", "META-INF/*.version", "META-INF/**/LICENSE.txt", "DebugProbesKt.bin")
     }
     assetPacks += ":combopack"
     buildFeatures {
