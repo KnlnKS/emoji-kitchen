@@ -41,7 +41,7 @@ To use the keyboard, tap the keyboard button at the top right of the app and tur
 <details>
 <summary><b>Why is the download so big?</b></summary>
 
-Every sticker is in the APK, so nothing is ever downloaded later. That's over 151,000 images, each re-encoded as a 256 px AVIF and packed into a single file of about 510 MB. The app memory-maps that file instead of unpacking it, so it doesn't take up the space twice.
+Every sticker is in the APK, so nothing is ever downloaded later. That's over 151,000 images, each re-encoded as a 256 px AVIF and packed into a single file of about 500 MB. The app memory-maps that file instead of unpacking it, so it doesn't take up the space twice.
 </details>
 
 ## Building
