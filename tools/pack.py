@@ -84,8 +84,11 @@ def download(url):
 
 
 def encode(src, dest):
+    image = Image.open(src).convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS)
+    if image.getextrema()[3][0] == 255:
+        image.putpixel((0, 0), image.getpixel((0, 0))[:3] + (254,))
     png = io.BytesIO()
-    Image.open(src).convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS).save(png, "PNG", compress_level=0)
+    image.save(png, "PNG", compress_level=0)
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_suffix(".part.avif")
     subprocess.run(["avifenc", "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
