@@ -24,7 +24,7 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
   - Wrap every adb command in `lockf -k "$EK_DATA/adb.lock" …`.
   - Reinstall with `adb install -r`. Never uninstall: it deletes the pushed pack.
 - **Data:** generated data lives only in `$EK_DATA` and is never committed.
-  - `$EK_DATA/out/kitchen.pak` is the full pack; `kitchen-mini.pak` has the first 60 emoji.
+  - Build packs with `tools/pack.py [--emoji 70]`, which needs `uv` and Homebrew `libavif`. `$EK_DATA/out/kitchen.pak` is the full pack; `kitchen-mini.pak` holds 70 emoji spread across every section.
   - Push a pack with `tools/push-pack.sh [kitchen-mini.pak]`.
 
 ## Modules
@@ -38,7 +38,7 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
 | `tools/` | `pack.py` pipeline, `push-pack.sh` |
 
 ## Contracts
-- **Emoji ids** `0..N-1` follow Google's widget: sections and order come from `tools/google-order.txt`. The 7 sections are contiguous, and `Kitchen.categoryStart` has `C+1` entries.
+- **Emoji ids** `0..N-1` follow Google's widget: emoji, order, sections and pairs come from Google's `emoji_kitchen_pairs.13.pb`, which `tools/pack.py` downloads. The 7 sections are contiguous, and `Kitchen.categoryStart` has `C+1` entries.
 - **Item ids:**
   - `0..N-1` are the base emoji images: item `e` is emoji `e`.
   - `N..N+P-1` are combos, sorted by (low, high).
