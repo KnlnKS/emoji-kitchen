@@ -24,6 +24,7 @@ class KitchenColors(
     val accent: Color,
     val footer: Color,
     val ripple: Color,
+    val shadow: Color,
 )
 
 val DarkColors = KitchenColors(
@@ -37,6 +38,7 @@ val DarkColors = KitchenColors(
     accent = Color(0xFFA8C7FA),
     footer = Color(0xFF9E9E9E),
     ripple = Color(0xFFE8EAED),
+    shadow = Color.Transparent,
 )
 
 val LightColors = KitchenColors(
@@ -50,6 +52,7 @@ val LightColors = KitchenColors(
     accent = Color(0xFF0B57D0),
     footer = Color(0xFF636363),
     ripple = Color(0xFF3C4043),
+    shadow = Color(0x293C4043),
 )
 
 val KitchenFont = FontFamily(Font(R.font.google_sans))
