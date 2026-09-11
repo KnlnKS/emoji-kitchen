@@ -1,8 +1,6 @@
 package com.kunalan.emojikitchen
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
@@ -37,8 +35,6 @@ import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.FullSpan
 import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
-
-private val SnapSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
 
 @Stable
 private class Reach(private val side: Dp, private val grid: LazyGridState) : PaddingValues, SnapLayoutInfoProvider {
@@ -90,7 +86,7 @@ internal fun ReachPage(
 ) {
     val reach = remember(side, grid) { Reach(side, grid) }
     val decay = rememberSplineBasedDecay<Float>()
-    val fling = remember(reach, decay) { snapFlingBehavior(reach, decay, SnapSpec) }
+    val fling = remember(reach, decay) { snapFlingBehavior(reach, decay, SettleSpec) }
     val horizontal = remember(columnSpacing) { Arrangement.spacedBy(columnSpacing) }
     val vertical = remember(rowSpacing) { Arrangement.spacedBy(rowSpacing) }
     Layout(

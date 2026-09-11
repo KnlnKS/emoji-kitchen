@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 import com.kunalan.emojikitchen.ui.R as UiR
 
 internal val EmojiColumns = AtLeast(9, 40.dp)
-private val PageSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = 1f)
+internal val SettleSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = 1f)
 
 @Composable
 fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
@@ -83,7 +83,7 @@ private suspend fun PagerState.glide(page: Int) = scroll(MutatePriority.UserInpu
     updateTargetPage(page)
     val distance = (page - currentPage - currentPageOffsetFraction) * (layoutInfo.pageSize + layoutInfo.pageSpacing)
     var done = 0f
-    animate(0f, distance, animationSpec = PageSpec) { value, _ -> done += scrollBy(value - done) }
+    animate(0f, distance, animationSpec = SettleSpec) { value, _ -> done += scrollBy(value - done) }
     scrollBy(distance - done)
 }
 
