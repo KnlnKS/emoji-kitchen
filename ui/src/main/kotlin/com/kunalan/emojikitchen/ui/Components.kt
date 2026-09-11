@@ -45,9 +45,9 @@ val LocalKitchen = staticCompositionLocalOf<Kitchen> { error("Kitchen not provid
 val CellShape = RoundedCornerShape(8.dp)
 
 @Composable
-fun KitchenImage(item: Int, modifier: Modifier = Modifier, alpha: Float = 1f, grayscale: Boolean = false) {
+fun KitchenImage(item: Int, modifier: Modifier = Modifier) {
     val bitmap = rememberBitmap(item)
-    Spacer(modifier.drawBehind { drawBitmap(bitmap.value, 1f, alpha, grayscale) })
+    Spacer(modifier.drawBehind { drawBitmap(bitmap.value, 1f, 1f, false) })
 }
 
 @Composable
@@ -75,14 +75,16 @@ fun EmojiCell(
 @Composable
 fun ComboCell(
     item: Int,
-    starred: Boolean,
-    dimmed: Boolean,
     onClick: (Int) -> Unit,
-    onLongClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    dimUnstarred: Boolean = false,
     shape: Shape = CellShape,
     imageScale: Float = 0.9f,
 ) {
+    val kitchen = LocalKitchen.current
+    val combo = remember(item) { kitchen.combo(item) }
+    val starred = combo in kitchen.favorites
+    val alpha = if (dimUnstarred && !starred) 0.35f else 1f
     val bitmap = rememberBitmap(item)
     val badge = animateFloatAsState(if (starred) 1f else 0f, BadgeSpec)
     val star = rememberVectorPainter(KitchenIcons.Star)
@@ -92,9 +94,9 @@ fun ComboCell(
         modifier
             .aspectRatio(1f)
             .clip(shape)
-            .combinedClickable(onLongClick = { onLongClick(item) }) { onClick(item) }
+            .combinedClickable(onLongClick = { kitchen.favorites.toggle(combo) }) { onClick(item) }
             .drawBehind {
-                drawBitmap(bitmap.value, imageScale, if (dimmed) 0.35f else 1f, false)
+                drawBitmap(bitmap.value, imageScale, alpha, false)
                 val s = badge.value
                 if (s > 0f) {
                     val d = size.minDimension * 0.36f
@@ -116,12 +118,16 @@ fun KitchenIcon(icon: ImageVector, tint: Color, modifier: Modifier = Modifier) {
     Box(modifier.paint(painter, colorFilter = filter))
 }
 
+fun Modifier.topLine(color: Color): Modifier = drawBehind {
+    drawRect(color, size = Size(size.width, 1.dp.toPx()))
+}
+
 @Composable
 private fun rememberBitmap(item: Int): State<Bitmap?> {
     val images = LocalKitchen.current.images
-    val peeked = remember(item) { if (item < 0) null else images.peek(item) }
+    val peeked = remember(item) { images.peek(item) }
     val state = remember(item) { mutableStateOf(peeked) }
-    if (peeked == null && item >= 0) LaunchedEffect(item) { state.value = images.load(item) }
+    if (peeked == null) LaunchedEffect(item) { state.value = images.load(item) }
     return state
 }
 

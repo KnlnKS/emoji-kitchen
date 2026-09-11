@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -48,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kunalan.emojikitchen.ui.KitchenIcon
 import com.kunalan.emojikitchen.ui.KitchenIcons
+import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.theme.KitchenFont
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
@@ -56,15 +56,6 @@ internal val PillText = TextStyle(fontFamily = KitchenFont, fontSize = 14.sp, li
 internal val OperatorText = TextStyle(fontFamily = KitchenFont, fontSize = 26.sp)
 internal val Caption = TextStyle(fontFamily = KitchenFont, fontSize = 13.sp)
 internal val Footnote = TextStyle(fontFamily = KitchenFont, fontSize = 11.sp)
-
-internal const val HeaderType = 0
-internal const val ComboType = 2
-internal const val BlockType = 3
-
-@Composable
-internal fun Label(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
-    BasicText(text, modifier, style, maxLines = 1, color = { color })
-}
 
 internal fun Modifier.bleed(x: Dp) = layout { measurable, constraints ->
     val px = x.roundToPx()

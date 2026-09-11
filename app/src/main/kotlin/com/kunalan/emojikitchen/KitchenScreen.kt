@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.ui.AtLeast
 import com.kunalan.emojikitchen.ui.Centered
 import com.kunalan.emojikitchen.ui.FullSpan
+import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.LocalKitchen
 import com.kunalan.emojikitchen.ui.Sections
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
@@ -88,7 +89,6 @@ private fun CombineTab(
     val kitchen = LocalKitchen.current
     var collapsed by rememberSaveable { mutableIntStateOf(0) }
     val onToggle: (Int) -> Unit = remember { { bit -> collapsed = collapsed xor (1 shl bit) } }
-    val onUnfavorite: (Int) -> Unit = remember(kitchen) { { item -> kitchen.favorites.toggle(kitchen.pairOf(item)) } }
     val favorites = kitchen.favorites.items
     val favoritesTitle = stringResource(R.string.favorites).uppercase()
     val a = state.a
@@ -101,11 +101,11 @@ private fun CombineTab(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        item("tabs", FullSpan, BlockType) { TabBar(state, Modifier.padding(top = 16.dp, bottom = 11.dp)) }
-        item("card", FullSpan, BlockType) {
+        item("tabs", FullSpan, "tabs") { TabBar(state, Modifier.padding(top = 16.dp, bottom = 11.dp)) }
+        item("card", FullSpan, "card") {
             CombineCard(state, keyboardSetup, onSetUpKeyboard, Modifier.bleed(1.dp).padding(bottom = 15.dp))
         }
-        favorites(kitchen, favorites, favoritesTitle, collapsed, onToggle, state.onLoad, onUnfavorite)
+        favorites(kitchen, favorites, favoritesTitle, collapsed, onToggle, state.onLoad)
         emojiSections(kitchen, sections, titles, collapsed, onToggle, a, b, other, state.onPick)
     }
 }

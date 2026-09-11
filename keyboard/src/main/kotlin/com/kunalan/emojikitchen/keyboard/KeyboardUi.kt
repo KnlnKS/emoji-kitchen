@@ -169,17 +169,13 @@ private fun ComboGrid(ime: KitchenIme, combo: ComboMode, modifier: Modifier) {
 
 @Composable
 private fun ComboItem(ime: KitchenIme, item: Int, favorite: Boolean) {
-    val kitchen = LocalKitchen.current
-    val starred = kitchen.combo(item) in kitchen.favorites
     ComboCell(
         item,
-        starred = starred,
-        dimmed = favorite && !starred,
         onClick = ime.onSend,
-        onLongClick = ime.onToggle,
         modifier = Modifier.drawWithContent {
             if (ime.pulseItem == item) scale(ime.pulse.value) { this@drawWithContent.drawContent() } else drawContent()
         },
+        dimUnstarred = favorite,
     )
 }
 

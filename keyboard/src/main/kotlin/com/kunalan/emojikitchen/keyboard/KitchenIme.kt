@@ -109,11 +109,6 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
         }
     }
 
-    internal val onToggle: (Int) -> Unit = { item ->
-        val k = kitchen!!
-        k.favorites.toggle(k.combo(item))
-    }
-
     internal val onGlobe: () -> Unit = { switchToNextInputMethod(false) }
 
     internal val onGlobeLong: () -> Unit = {

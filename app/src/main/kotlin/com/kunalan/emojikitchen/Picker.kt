@@ -18,17 +18,19 @@ import androidx.compose.ui.unit.dp
 import com.kunalan.emojikitchen.core.Combo
 import com.kunalan.emojikitchen.core.Kitchen
 import com.kunalan.emojikitchen.ui.ComboCell
+import com.kunalan.emojikitchen.ui.ComboContent
 import com.kunalan.emojikitchen.ui.EmojiCell
 import com.kunalan.emojikitchen.ui.FullSpan
+import com.kunalan.emojikitchen.ui.GridContent
 import com.kunalan.emojikitchen.ui.KitchenIcon
 import com.kunalan.emojikitchen.ui.KitchenIcons
+import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.Sections
 import com.kunalan.emojikitchen.ui.sectioned
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
 private const val FavoritesBit = 7
 private val EmojiKey: (Int) -> Any = { it }
-private val ComboContent: (Int) -> Any = { ComboType }
 private val ChevronSpec = tween<Float>(240, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f))
 
 internal fun LazyGridScope.emojiSections(
@@ -60,15 +62,13 @@ internal fun LazyGridScope.favorites(
     collapsed: Int,
     onToggle: (Int) -> Unit,
     onClick: (Int) -> Unit,
-    onLongClick: (Int) -> Unit,
 ) {
     if (favorites.isEmpty()) return
     val closed = collapsed and (1 shl FavoritesBit) != 0
-    item("favorites", FullSpan, HeaderType) { SectionHeader(title, closed) { onToggle(FavoritesBit) } }
+    item("favorites", FullSpan, GridContent.Header) { SectionHeader(title, closed) { onToggle(FavoritesBit) } }
     if (closed) return
     items(favorites.size, key = { -1 - favorites[it].packed }, contentType = ComboContent) {
-        val c = favorites[it]
-        ComboCell(kitchen.item(c.a, c.b), starred = true, dimmed = false, onClick = onClick, onLongClick = onLongClick)
+        ComboCell(kitchen.item(favorites[it]), onClick)
     }
 }
 

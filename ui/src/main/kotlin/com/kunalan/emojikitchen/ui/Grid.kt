@@ -1,30 +1,12 @@
 package com.kunalan.emojikitchen.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope
 import androidx.compose.foundation.lazy.grid.LazyGridScope
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.kunalan.emojikitchen.ui.theme.KitchenFont
-import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
 class Sections(private val starts: IntArray) {
     private val headers = IntArray(starts.size - 1)
@@ -63,11 +45,15 @@ class AtLeast(private val count: Int, private val minSize: Dp) : GridCells {
     }
 }
 
-val FullSpan: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
+object GridContent {
+    const val Header = 0
+    const val Cell = 1
+    const val Combo = 2
+}
 
-private const val HeaderType = 0
-private const val CellType = 1
-private val CellContent: (Int) -> Any = { CellType }
+val FullSpan: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
+val CellContent: (Int) -> Any = { GridContent.Cell }
+val ComboContent: (Int) -> Any = { GridContent.Combo }
 
 fun LazyGridScope.sectioned(
     sections: Sections,
@@ -81,43 +67,8 @@ fun LazyGridScope.sectioned(
         val count = sections.length(s)
         if (count == 0) continue
         val from = sections.start(s)
-        item(span = FullSpan, contentType = HeaderType) { header(s) }
+        item(span = FullSpan, contentType = GridContent.Header) { header(s) }
         if (collapsed and (1 shl s) != 0) continue
         items(count, key?.let { k -> { k(from + it) } }, contentType = CellContent) { cell(from + it) }
     }
-}
-
-@Composable
-fun Header(text: String) {
-    BasicText(
-        text,
-        Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 12.dp).wrapContentHeight(Alignment.CenterVertically),
-        style = TextStyle(
-            color = KitchenTheme.colors.secondaryText,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = KitchenFont,
-        ),
-        maxLines = 1,
-    )
-}
-
-@Composable
-fun Centered(text: String, modifier: Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        BasicText(
-            text,
-            Modifier.padding(horizontal = 16.dp),
-            style = TextStyle(
-                color = KitchenTheme.colors.secondaryText,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-                fontFamily = KitchenFont,
-            ),
-        )
-    }
-}
-
-fun Modifier.topLine(color: Color): Modifier = drawBehind {
-    drawRect(color, size = Size(size.width, 1.dp.toPx()))
 }

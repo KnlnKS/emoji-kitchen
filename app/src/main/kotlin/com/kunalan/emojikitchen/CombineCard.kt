@@ -49,6 +49,7 @@ import com.kunalan.emojikitchen.core.copyToClipboard
 import com.kunalan.emojikitchen.ui.KitchenIcon
 import com.kunalan.emojikitchen.ui.KitchenIcons
 import com.kunalan.emojikitchen.ui.KitchenImage
+import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.LocalKitchen
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 import kotlinx.coroutines.delay
