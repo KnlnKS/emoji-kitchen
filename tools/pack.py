@@ -190,11 +190,9 @@ def load(k):
     order = ["-".join(f"{ord(c):x}" for c in e) for e in emojis]
     dataset = {frozenset((cp, other)): c["gStaticUrl"] for cp, v in data.items()
                for other, combos in v["combinations"].items() for c in combos if c["isLatest"]}
-    google = {frozenset((c["left"], c["right"])): c["url"]
-              for c in json.loads((EK_DATA / "google-combos.json").read_bytes())}
     dates = sorted({url.split("/")[-3] for url in dataset.values()}.union(GOOGLE_DATES), reverse=True)
     names = [frozenset((order[a], order[b])) for a, b in pairs]
-    urls = [[u for u in (dataset.get(s), google.get(s)) if u] for s in names]
+    urls = [[dataset[s]] if s in dataset else [] for s in names]
     todo = [i for i, u in enumerate(urls) if not u]
     for i, url in zip(todo, probe([(order[pairs[i][0]], order[pairs[i][1]]) for i in todo], dates)):
         if url:
@@ -203,7 +201,6 @@ def load(k):
     chosen, kept = set(order), set(names)
     removed = sorted(tuple(sorted(s)) for s in dataset if s <= chosen and s not in kept)
     print(f"resolved: dataset={sum(s in dataset for s in names)} "
-          f"google-combos={sum(s in google and s not in dataset for s in names)} "
           f"probed={len(todo) - len(unresolved)}/{len(todo)} unresolved={len(unresolved)} {unresolved}")
     print(f"removed {len(removed)} dataset pairs not in Google's set: {removed}")
     resolved = [((a, b), (urlparse(u[0]).path.lstrip("/"), chain(u, gstatic(order[a], order[b], dates))))
