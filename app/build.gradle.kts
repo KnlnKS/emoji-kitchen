@@ -7,6 +7,7 @@ plugins {
 
 val keystore = providers.fileContents(rootProject.layout.projectDirectory.file("keystore.properties")).asText.orNull
     ?.let { text -> Properties().apply { load(text.reader()) } }
+val buildNumber = providers.environmentVariable("BUILD_NUMBER").map(String::toInt).getOrElse(1)
 
 android {
     namespace = "com.kunalan.emojikitchen"
@@ -15,8 +16,8 @@ android {
         applicationId = "com.kunalan.emojikitchen"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = buildNumber
+        versionName = "1.0.$buildNumber"
     }
     buildTypes {
         release {
