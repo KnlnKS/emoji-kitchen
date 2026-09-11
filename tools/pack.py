@@ -31,8 +31,6 @@ PAIRS_URL = "https://www.google.com/logos/fnbx/emoji_kitchen/emoji_kitchen_pairs
 GSTATIC_URL = "https://www.gstatic.com/android/keyboard/emojikitchen/{0}/{1}/{1}_{2}.png"
 GOOGLE_DATES = ("20240612", "20241004", "20241113", "20250728", "20260428", "20260728")
 NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
-AVIFENC = shutil.which("avifenc") or "/opt/homebrew/bin/avifenc"
-AVIFDEC = shutil.which("avifdec")
 C = 7
 MAGIC, VERSION = 0x4B504B45, 2
 HEADER = struct.Struct("<IHH11I12x")
@@ -90,7 +88,7 @@ def encode(src, dest):
     Image.open(src).convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS).save(png, "PNG", compress_level=0)
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_suffix(".part.avif")
-    subprocess.run([AVIFENC, "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
+    subprocess.run(["avifenc", "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
                     "--qalpha", str(ALPHA_QUALITY), "-y", "444", str(part)],
                    input=png.getvalue(), check=True, capture_output=True)
     os.replace(part, dest)
@@ -276,16 +274,15 @@ def verify(path, emojis, p, a):
         assert starts[0] == start_off + 8 * (n + p + 1) and starts[-1] == len(m)
         for s in starts[:-1]:
             assert m[s + 4:s + 12] == b"ftypavif"
-        if AVIFDEC:
-            with tempfile.NamedTemporaryFile(suffix=".avif", dir=OUT) as tmp:
-                for i in random.sample(range(n + p), min(20, n + p)):
-                    tmp.seek(0)
-                    tmp.truncate()
-                    tmp.write(m[starts[i]:starts[i + 1]])
-                    tmp.flush()
-                    subprocess.run([AVIFDEC, "--info", tmp.name], check=True, capture_output=True)
+        with tempfile.NamedTemporaryFile(suffix=".avif", dir=OUT) as tmp:
+            for i in random.sample(range(n + p), min(20, n + p)):
+                tmp.seek(0)
+                tmp.truncate()
+                tmp.write(m[starts[i]:starts[i + 1]])
+                tmp.flush()
+                subprocess.run(["avifdec", "--info", tmp.name], check=True, capture_output=True)
         print(f"verified {path}: N={n} P={p} A={a} items={n + p} total={len(m) / 2 ** 20:.1f} MB "
-              f"avg={(starts[-1] - starts[0]) / (n + p) / 1024:.1f} KB/item avifdec={'20 ok' if AVIFDEC else 'skipped'}")
+              f"avg={(starts[-1] - starts[0]) / (n + p) / 1024:.1f} KB/item")
 
 
 def main():
