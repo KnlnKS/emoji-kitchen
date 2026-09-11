@@ -23,6 +23,7 @@ class KitchenColors(
     val pressed: Color,
     val accent: Color,
     val footer: Color,
+    val ripple: Color,
 )
 
 val DarkColors = KitchenColors(
@@ -35,18 +36,20 @@ val DarkColors = KitchenColors(
     pressed = Color(0xFFC3C6D6),
     accent = Color(0xFFA8C7FA),
     footer = Color(0xFF9E9E9E),
+    ripple = Color(0xFFE8EAED),
 )
 
 val LightColors = KitchenColors(
     surface = Color(0xFFFFFFFF),
     secondarySurface = Color(0xFFF0F2F5),
-    border = Color(0xFFDCDFE5),
+    border = Color(0xFFD2D2D2),
     primaryText = Color(0xFF1F1F1F),
-    secondaryText = Color(0xFF0A0A0A),
-    selected = Color(0xFFE8F0FE),
-    pressed = Color(0xFF56595E),
+    secondaryText = Color(0xFF545454),
+    selected = Color(0xFFEBF1FF),
+    pressed = Color(0xFF3C4043),
     accent = Color(0xFF0B57D0),
-    footer = Color(0xFF9E9E9E),
+    footer = Color(0xFF636363),
+    ripple = Color(0xFF3C4043),
 )
 
 val KitchenFont = FontFamily(Font(R.font.google_sans))
