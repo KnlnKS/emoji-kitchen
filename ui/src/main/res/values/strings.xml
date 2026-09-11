@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="sections">
+        <item>Smileys and emotions</item>
+        <item>Animals and nature</item>
+        <item>Food and drink</item>
+        <item>Travel and places</item>
+        <item>Activities and events</item>
+        <item>Objects</item>
+        <item>Symbols</item>
+    </string-array>
+</resources>
