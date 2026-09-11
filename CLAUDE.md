@@ -38,11 +38,11 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
 | `tools/` | `pack.py` pipeline, `push-pack.sh` |
 
 ## Contracts
-- **Emoji ids** `0..N-1` are sorted by (section, gBoardOrder). The 7 sections are contiguous, and `Kitchen.categoryStart` has `C+1` entries.
+- **Emoji ids** `0..N-1` follow Google's widget: sections and order come from `tools/google-order.txt`. The 7 sections are contiguous, and `Kitchen.categoryStart` has `C+1` entries.
 - **Item ids:**
   - `0..N-1` are the base emoji images: item `e` is emoji `e`.
   - `N..N+P-1` are combos, sorted by (low, high).
-- **Partner lists:** `partner(e,k)` and `partnerItem(e,k)` are ordered by partner id ascending, which is gBoardOrder within sections. `item(a,b)` returns -1 when the pair doesn't exist.
+- **Partner lists:** `partner(e,k)` and `partnerItem(e,k)` are ordered by partner id ascending, which is Google's order within sections. `item(a,b)` returns -1 when the pair doesn't exist.
 - **`Combo`** packs a pair as `low shl 16 or high`.
 - **Favorites and recents:** `Kitchen.favorites` and `Kitchen.recents` are snapshot-state lists shared by the app and the IME, which run in the same process.
 - **Compose:** components read `Kitchen` from `LocalKitchen` and colors from `KitchenTheme.colors`. Grid callbacks take `(Int) -> Unit`, so no lambda is allocated per cell.
