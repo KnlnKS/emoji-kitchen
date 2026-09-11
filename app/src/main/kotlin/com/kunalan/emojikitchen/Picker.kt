@@ -11,6 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -33,12 +39,26 @@ private const val FavoritesBit = 7
 private val EmojiKey: (Int) -> Any = { it }
 private val ChevronSpec = tween<Float>(240, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f))
 
+@Stable
+internal class Collapsed(bits: Int) {
+    var bits by mutableIntStateOf(bits)
+        private set
+
+    val toggle: (Int) -> Unit = { bit -> this.bits = this.bits xor (1 shl bit) }
+
+    operator fun contains(bit: Int): Boolean = bits and (1 shl bit) != 0
+}
+
+private val CollapsedSaver = Saver<Collapsed, Int>({ it.bits }, ::Collapsed)
+
+@Composable
+internal fun rememberCollapsed(): Collapsed = rememberSaveable(saver = CollapsedSaver) { Collapsed(0) }
+
 internal fun LazyGridScope.emojiSections(
     kitchen: Kitchen,
     sections: Sections,
     titles: Array<String>,
-    collapsed: Int,
-    onToggle: (Int) -> Unit,
+    collapsed: Collapsed,
     first: Int,
     second: Int,
     other: Int,
@@ -47,9 +67,9 @@ internal fun LazyGridScope.emojiSections(
     sectioned(
         sections,
         titles,
-        collapsed,
+        collapsed.bits,
         EmojiKey,
-        header = { s -> SectionHeader(titles[s], collapsed and (1 shl s) != 0) { onToggle(s) } },
+        header = { s -> SectionHeader(titles[s], s in collapsed) { collapsed.toggle(s) } },
     ) { e ->
         EmojiCell(e, e == first || e == second, other < 0 || kitchen.item(other, e) >= 0, onPick)
     }
@@ -59,13 +79,12 @@ internal fun LazyGridScope.favorites(
     kitchen: Kitchen,
     favorites: List<Combo>,
     title: String,
-    collapsed: Int,
-    onToggle: (Int) -> Unit,
+    collapsed: Collapsed,
     onClick: (Int) -> Unit,
 ) {
     if (favorites.isEmpty()) return
-    val closed = collapsed and (1 shl FavoritesBit) != 0
-    item("favorites", FullSpan, GridContent.Header) { SectionHeader(title, closed) { onToggle(FavoritesBit) } }
+    val closed = FavoritesBit in collapsed
+    item("favorites", FullSpan, GridContent.Header) { SectionHeader(title, closed) { collapsed.toggle(FavoritesBit) } }
     if (closed) return
     items(favorites.size, key = { -1 - favorites[it].packed }, contentType = ComboContent) {
         ComboCell(kitchen.item(favorites[it]), onClick)

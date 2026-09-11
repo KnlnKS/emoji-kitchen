@@ -13,11 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,9 +36,8 @@ private val TileColumns = AtLeast(5, 64.dp)
 internal fun ExploreTab(state: KitchenState, sections: Sections, titles: Array<String>, grid: LazyGridState) {
     val kitchen = LocalKitchen.current
     val colors = KitchenTheme.colors
+    val collapsed = rememberCollapsed()
     val e = state.explore
-    var collapsed by rememberSaveable { mutableIntStateOf(0) }
-    val onToggle: (Int) -> Unit = remember { { bit -> collapsed = collapsed xor (1 shl bit) } }
     val shown = remember { e }
     LaunchedEffect(e) { if (e != shown) grid.scrollToItem(0) }
     Box(Modifier.fillMaxSize()) {
@@ -81,7 +76,7 @@ internal fun ExploreTab(state: KitchenState, sections: Sections, titles: Array<S
                 contentPadding = PaddingValues(start = 13.dp, top = 1.dp, end = 13.dp, bottom = 13.dp),
                 verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
-                emojiSections(kitchen, sections, titles, collapsed, onToggle, e, -1, -1, state.onExplore)
+                emojiSections(kitchen, sections, titles, collapsed, e, -1, -1, state.onExplore)
             }
         }
     }

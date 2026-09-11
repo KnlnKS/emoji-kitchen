@@ -19,10 +19,8 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -60,7 +58,7 @@ fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
             .safeDrawingPadding(),
     ) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (state.tab == 0) {
+            if (state.tab == Combine) {
                 CombineTab(state, sections, titles, combineGrid, keyboardSetup, onSetUpKeyboard)
                 Fade(combineGrid, colors.surface)
             } else {
@@ -87,8 +85,7 @@ private fun CombineTab(
     onSetUpKeyboard: () -> Unit,
 ) {
     val kitchen = LocalKitchen.current
-    var collapsed by rememberSaveable { mutableIntStateOf(0) }
-    val onToggle: (Int) -> Unit = remember { { bit -> collapsed = collapsed xor (1 shl bit) } }
+    val collapsed = rememberCollapsed()
     val favorites = kitchen.favorites.items
     val favoritesTitle = stringResource(R.string.favorites).uppercase()
     val a = state.a
@@ -105,8 +102,8 @@ private fun CombineTab(
         item("card", FullSpan, "card") {
             CombineCard(state, keyboardSetup, onSetUpKeyboard, Modifier.bleed(1.dp).padding(bottom = 15.dp))
         }
-        favorites(kitchen, favorites, favoritesTitle, collapsed, onToggle, state.onLoad)
-        emojiSections(kitchen, sections, titles, collapsed, onToggle, a, b, other, state.onPick)
+        favorites(kitchen, favorites, favoritesTitle, collapsed, state.onLoad)
+        emojiSections(kitchen, sections, titles, collapsed, a, b, other, state.onPick)
     }
 }
 
