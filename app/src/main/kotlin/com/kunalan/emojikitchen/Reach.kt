@@ -35,7 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
@@ -108,7 +108,7 @@ private val WispEasing = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
 private const val WispMillis = 300f
 private const val WispStagger = 60f
 
-private class Steam(vector: ImageVector) {
+private class Steam(vector: ImageVector, color: Color) {
     private val source = vector.root[0] as VectorPath
     private val wisps = PathMeasure(source.pathData.toPath().asAndroidPath(), false).run {
         buildList { do add(PathMeasure(Path().also { getSegment(0f, length, it, true) }, false)) while (nextContour()) }
@@ -120,7 +120,7 @@ private class Steam(vector: ImageVector) {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeWidth = source.strokeLineWidth
-        color = (source.stroke as SolidColor).value.toArgb()
+        this.color = color.toArgb()
     }
     val spec = tween<Float>(millis.toInt(), easing = LinearEasing)
 
@@ -155,7 +155,8 @@ internal fun ReachPage(
 ) {
     val reach = remember(side, grid) { Reach(side, grid) }
     val vector = ImageVector.vectorResource(R.drawable.logo_steam)
-    val steam = remember(vector) { Steam(vector) }
+    val color = KitchenTheme.colors.steam
+    val steam = remember(vector, color) { Steam(vector, color) }
     val decay = rememberSplineBasedDecay<Float>()
     val fling = remember(reach, decay) { snapFlingBehavior(reach, decay, SettleSpec) }
     val horizontal = remember(columnSpacing) { Arrangement.spacedBy(columnSpacing) }
