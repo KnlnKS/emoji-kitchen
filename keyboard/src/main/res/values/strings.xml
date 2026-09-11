@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ime_name">Emoji Kitchen</string>
+    <string name="favorites">Favorites</string>
+    <string name="recent">Recent</string>
+    <string name="next_keyboard">Next keyboard</string>
+    <string name="back">Back</string>
+    <string name="save_hint">Long-press a sticker to save it</string>
+    <string name="no_images">Stickers can\'t be sent here – tapping copies to clipboard</string>
+    <string name="data_missing">Emoji data missing</string>
 </resources>
