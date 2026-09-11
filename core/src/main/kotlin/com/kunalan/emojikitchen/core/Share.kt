@@ -17,7 +17,7 @@ suspend fun Kitchen.pngUri(item: Int): Uri = withContext(Dispatchers.IO) {
     if (!file.isFile) {
         dir.mkdirs()
         val tmp = File.createTempFile("share", null, dir)
-        tmp.outputStream().use { out -> images.decode(item) { it.compress(Bitmap.CompressFormat.PNG, 100, out) } }
+        tmp.outputStream().use { images.decode(item).compress(Bitmap.CompressFormat.PNG, 100, it) }
         tmp.renameTo(file)
     }
     FileProvider.getUriForFile(context, "${context.packageName}.share", file)
