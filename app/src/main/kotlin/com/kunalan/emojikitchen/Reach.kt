@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
@@ -217,11 +218,11 @@ private fun Gap(reach: Reach, steam: Steam) {
     ) {
         Spacer(
             Modifier
-                .requiredSize(108.dp)
+                .requiredSize(124.dp)
                 .graphicsLayer { alpha = with(reach) { fade() } }
                 .semantics { contentDescription = name }
                 .drawBehind { with(steam) { draw(progress.value) } }
-                .paint(pot),
+                .paint(pot, contentScale = ContentScale.FillBounds),
         )
     }
 }
