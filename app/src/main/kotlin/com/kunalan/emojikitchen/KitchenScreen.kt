@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -37,7 +38,7 @@ internal val EmojiColumns = AtLeast(9, 40.dp)
 internal val SettleSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = 1f)
 
 @Composable
-fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
+fun KitchenScreen(onSetUpKeyboard: () -> Unit) {
     val kitchen = LocalKitchen.current
     val colors = KitchenTheme.colors
     val state = rememberSaveable(kitchen, saver = KitchenState.saver(kitchen)) { KitchenState.random(kitchen) }
@@ -62,10 +63,16 @@ fun KitchenScreen(keyboardSetup: Boolean, onSetUpKeyboard: () -> Unit) {
             .background(colors.surface)
             .safeDrawingPadding(),
     ) {
-        TabBar(state, pager, go, Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp))
+        Row(
+            Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabBar(state, pager, go, Modifier.weight(1f))
+            KeyboardButton(onSetUpKeyboard, Modifier.padding(start = 8.dp))
+        }
         HorizontalPager(pager, Modifier.weight(1f), beyondViewportPageCount = if (state.explored) 1 else 0) { page ->
             if (page == Combine) {
-                CombineTab(state, sections, titles, combineGrid, keyboardSetup, onSetUpKeyboard)
+                CombineTab(state, sections, titles, combineGrid)
             } else {
                 ExploreTab(state, sections, titles, exploreGrid, loadExplored)
             }
@@ -92,8 +99,6 @@ private fun CombineTab(
     sections: Sections,
     titles: Array<String>,
     grid: LazyGridState,
-    keyboardSetup: Boolean,
-    onSetUpKeyboard: () -> Unit,
 ) {
     val kitchen = LocalKitchen.current
     val collapsed = rememberCollapsed()
@@ -102,7 +107,7 @@ private fun CombineTab(
     val a = state.a
     val b = state.b
     val other = state.other
-    ReachPage(grid, EmojiColumns, 16.dp, 0.dp, 1.dp, card = { CombineCard(state, keyboardSetup, onSetUpKeyboard) }) {
+    ReachPage(grid, EmojiColumns, 16.dp, 0.dp, 1.dp, card = { CombineCard(state) }) {
         favorites(kitchen, favorites, favoritesTitle, collapsed, state.onLoad)
         emojiSections(kitchen, sections, titles, collapsed, a, b, other, state.onPick)
     }

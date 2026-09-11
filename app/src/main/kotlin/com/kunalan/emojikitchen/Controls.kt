@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -93,6 +95,25 @@ internal fun TabBar(state: KitchenState, pager: PagerState, onTab: (Int) -> Unit
         Segment(Combine, R.string.combine, KitchenIcons.Blender, state, onTab, Modifier.weight(1f))
         Spacer(Modifier.fillMaxHeight().width(1.dp).background(colors.border))
         Segment(Explore, R.string.explore, KitchenIcons.Explore, state, onTab, Modifier.weight(1f))
+    }
+}
+
+@Composable
+internal fun KeyboardButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = KitchenTheme.colors
+    val label = stringResource(R.string.set_up_keyboard)
+    Box(
+        modifier
+            .size(38.dp)
+            .raised(CircleShape, colors.shadow)
+            .clip(CircleShape)
+            .background(colors.surface)
+            .border(1.dp, colors.border, CircleShape)
+            .semantics { contentDescription = label }
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        KitchenIcon(KitchenIcons.Keyboard, colors.secondaryText, Modifier.size(20.dp))
     }
 }
 

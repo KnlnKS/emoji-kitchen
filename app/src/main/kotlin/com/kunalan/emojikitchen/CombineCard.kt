@@ -63,11 +63,7 @@ private val RevealSpec = tween<Float>(350)
 private val IconSpec = tween<Float>(150)
 
 @Composable
-internal fun CombineCard(
-    state: KitchenState,
-    keyboardSetup: Boolean,
-    onSetUpKeyboard: () -> Unit,
-) {
+internal fun CombineCard(state: KitchenState) {
     val kitchen = LocalKitchen.current
     val colors = KitchenTheme.colors
     val scope = rememberCoroutineScope()
@@ -124,7 +120,7 @@ internal fun CombineCard(
                 }
             }
         }
-        Row(Modifier.padding(top = 12.dp, bottom = if (keyboardSetup) 10.dp else 20.dp)) {
+        Row(Modifier.padding(top = 12.dp, bottom = 20.dp)) {
             Pill(R.string.randomize, state.onRandomize) {
                 KitchenIcon(KitchenIcons.Randomize, colors.secondaryText, Modifier.padding(start = 5.dp).size(17.dp))
             }
@@ -132,13 +128,6 @@ internal fun CombineCard(
             Pill(R.string.clear_all, state.onClear) {
                 Box(Modifier.padding(start = 4.dp).size(10.6.dp, 12.dp), contentAlignment = Alignment.Center) {
                     KitchenIcon(KitchenIcons.Delete, colors.secondaryText, Modifier.requiredSize(17.dp))
-                }
-            }
-        }
-        if (keyboardSetup) {
-            Box(Modifier.padding(bottom = 20.dp)) {
-                Pill(R.string.set_up_keyboard, onSetUpKeyboard) {
-                    KitchenIcon(KitchenIcons.Keyboard, colors.secondaryText, Modifier.padding(start = 4.dp).size(18.dp))
                 }
             }
         }
