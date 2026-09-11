@@ -23,9 +23,9 @@ from urllib.parse import urlparse
 
 from PIL import Image
 
-SIZE, QUALITY, ALPHA_QUALITY = 256, 30, 55
+SIZE, QUALITY, ALPHA_QUALITY, CHROMA = 256, 30, 40, "420"
 EK_DATA = Path(os.environ.get("EK_DATA") or Path.home() / ".cache/emoji-kitchen")
-PNG, AVIF, OUT = EK_DATA / "png", EK_DATA / f"avif{SIZE}q{QUALITY}a{ALPHA_QUALITY}", EK_DATA / "out"
+PNG, AVIF, OUT = EK_DATA / "png", EK_DATA / f"avif{SIZE}q{QUALITY}a{ALPHA_QUALITY}y{CHROMA}", EK_DATA / "out"
 METADATA_URL = "https://raw.githubusercontent.com/xsalazar/emoji-kitchen-backend/main/app/metadata.json"
 PAIRS_URL = "https://www.google.com/logos/fnbx/emoji_kitchen/emoji_kitchen_pairs.13.pb"
 GSTATIC_URL = "https://www.gstatic.com/android/keyboard/emojikitchen/{0}/{1}/{1}_{2}.png"
@@ -89,7 +89,7 @@ def encode(src, dest):
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_suffix(".part.avif")
     subprocess.run(["avifenc", "--stdin", "--input-format", "png", "-s", "2", "-j", "1", "-q", str(QUALITY),
-                    "--qalpha", str(ALPHA_QUALITY), "-y", "444", str(part)],
+                    "--qalpha", str(ALPHA_QUALITY), "-y", CHROMA, str(part)],
                    input=png.getvalue(), check=True, capture_output=True)
     os.replace(part, dest)
     return dest
