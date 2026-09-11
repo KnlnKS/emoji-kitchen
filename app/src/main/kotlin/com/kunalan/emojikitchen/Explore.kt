@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,8 +39,12 @@ internal fun ExploreTab(
     val colors = KitchenTheme.colors
     val collapsed = rememberCollapsed()
     val e = state.explore
-    val shown = remember { e }
-    LaunchedEffect(e) { if (e != shown) grid.scrollToItem(0) }
+    val pick: (Int) -> Unit = remember(state, grid) {
+        { next ->
+            if (next != state.explore) grid.requestScrollToItem(if (grid.firstVisibleItemIndex > 0) 1 else 0)
+            state.onExplore(next)
+        }
+    }
     ReachPage(
         grid,
         TileColumns,
@@ -68,7 +71,7 @@ internal fun ExploreTab(
                     contentPadding = PaddingValues(start = 13.dp, top = 1.dp, end = 13.dp, bottom = 13.dp),
                     verticalArrangement = Arrangement.spacedBy(1.dp),
                 ) {
-                    emojiSections(kitchen, sections, titles, collapsed, e, -1, -1, state.onExplore)
+                    emojiSections(kitchen, sections, titles, collapsed, e, -1, -1, pick)
                 }
             }
         },

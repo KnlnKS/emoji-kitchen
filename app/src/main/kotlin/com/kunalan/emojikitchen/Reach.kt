@@ -1,8 +1,13 @@
 package com.kunalan.emojikitchen
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
+import androidx.compose.foundation.gestures.snapping.snapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -25,16 +30,47 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.kunalan.emojikitchen.ui.FullSpan
 import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
+private val SnapSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
+
 @Stable
-private class Reach(private val side: Dp) : PaddingValues {
+private class Reach(private val side: Dp, private val grid: LazyGridState) : PaddingValues, SnapLayoutInfoProvider {
+    var page by mutableFloatStateOf(0f)
     var inset by mutableFloatStateOf(0f)
+    private var projected = Float.NaN
+
+    val gap: Dp get() = maxOf(0f, (page - inset) / 2).dp
 
     override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = side
     override fun calculateTopPadding(): Dp = 0.dp
     override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp = side
     override fun calculateBottomPadding(): Dp = inset.dp
+
+    override fun calculateApproachOffset(velocity: Float, decayOffset: Float): Float {
+        if (grid.firstVisibleItemIndex != 0) {
+            projected = Float.NaN
+            return decayOffset
+        }
+        projected = grid.firstVisibleItemScrollOffset + decayOffset
+        return if (projected < span()) 0f else decayOffset
+    }
+
+    override fun calculateSnapOffset(velocity: Float): Float {
+        val end = projected
+        projected = Float.NaN
+        if (grid.firstVisibleItemIndex != 0) return 0f
+        val offset = grid.firstVisibleItemScrollOffset.toFloat()
+        val span = span()
+        val target = if (end.isNaN() || end >= span) offset else end
+        return if (target * 2 < span) -offset else span - offset
+    }
+
+    private fun span(): Float {
+        val info = grid.layoutInfo
+        return (info.visibleItemsInfo.firstOrNull()?.size?.height ?: 0) + info.mainAxisItemSpacing.toFloat()
+    }
 }
 
 @Composable
@@ -47,7 +83,9 @@ internal fun ReachPage(
     card: @Composable () -> Unit,
     content: LazyGridScope.() -> Unit,
 ) {
-    val reach = remember(side) { Reach(side) }
+    val reach = remember(side, grid) { Reach(side, grid) }
+    val decay = rememberSplineBasedDecay<Float>()
+    val fling = remember(reach, decay) { snapFlingBehavior(reach, decay, SnapSpec) }
     val horizontal = remember(columnSpacing) { Arrangement.spacedBy(columnSpacing) }
     val vertical = remember(rowSpacing) { Arrangement.spacedBy(rowSpacing) }
     Layout(
@@ -58,8 +96,11 @@ internal fun ReachPage(
                 contentPadding = reach,
                 verticalArrangement = vertical,
                 horizontalArrangement = horizontal,
-                content = content,
-            )
+                flingBehavior = fling,
+            ) {
+                item("reach", FullSpan, "reach") { Gap(reach) }
+                content()
+            }
             Fade(grid)
             card()
         },
@@ -70,6 +111,7 @@ internal fun ReachPage(
         val bottom = 12.dp.roundToPx()
         val cardWidth = width - 2 * margin
         val cardPlaceable = measurables[2].measure(Constraints(cardWidth, cardWidth, 0, height))
+        reach.page = height.toDp().value
         reach.inset = (cardPlaceable.height + 2 * bottom).toDp().value
         val gridPlaceable = measurables[0].measure(Constraints.fixed(width, height))
         val fadePlaceable = measurables[1].measure(Constraints.fixedWidth(width))
@@ -79,6 +121,17 @@ internal fun ReachPage(
             cardPlaceable.place(margin, height - bottom - cardPlaceable.height)
         }
     }
+}
+
+@Composable
+private fun Gap(reach: Reach) {
+    Spacer(
+        Modifier.layout { measurable, constraints ->
+            val height = reach.gap.roundToPx()
+            val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
+            layout(placeable.width, height) { placeable.place(0, 0) }
+        },
+    )
 }
 
 @Composable
