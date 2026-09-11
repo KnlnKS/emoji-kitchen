@@ -10,9 +10,9 @@ import java.nio.LongBuffer
 import java.nio.ShortBuffer
 import java.nio.channels.FileChannel
 
-internal class PackIndex(private val channel: FileChannel, private val base: Long) {
+open class PackIndex internal constructor(private val channel: FileChannel, private val base: Long) {
     val emojiCount: Int
-    val pairCount: Int
+    internal val pairCount: Int
     val categoryStart: IntArray
     private val emojis: Array<String>
     private val ids: MutableObjectIntMap<String>
@@ -58,7 +58,7 @@ internal class PackIndex(private val channel: FileChannel, private val base: Lon
         }
     }
 
-    val size: Long get() = itemStart[emojiCount + pairCount]
+    internal val size: Long get() = itemStart[emojiCount + pairCount]
 
     fun emoji(e: Int): String = emojis[e]
 
@@ -69,6 +69,20 @@ internal class PackIndex(private val channel: FileChannel, private val base: Lon
     fun partner(e: Int, k: Int): Int = partnerAt(adjStart[e] + k)
 
     fun partnerItem(e: Int, k: Int): Int = adjItem[adjStart[e] + k]
+
+    fun partnerSectionStarts(e: Int): IntArray {
+        val from = adjStart[e]
+        val to = adjStart[e + 1]
+        return IntArray(categoryStart.size) { s ->
+            var lo = from
+            var hi = to
+            while (lo < hi) {
+                val mid = (lo + hi) ushr 1
+                if (partnerAt(mid) < categoryStart[s]) lo = mid + 1 else hi = mid
+            }
+            lo - from
+        }
+    }
 
     fun item(a: Int, b: Int): Int {
         var lo = adjStart[a]
@@ -85,6 +99,8 @@ internal class PackIndex(private val channel: FileChannel, private val base: Lon
         return -1
     }
 
+    fun item(c: Combo): Int = item(c.a, c.b)
+
     fun combo(item: Int): Combo {
         var lo = 0
         var hi = emojiCount
@@ -96,7 +112,7 @@ internal class PackIndex(private val channel: FileChannel, private val base: Lon
         return Combo(a shl 16 or partnerAt(adjStart[lo] - comboStart[lo] + item))
     }
 
-    fun read(item: Int): ByteBuffer {
+    internal fun read(item: Int): ByteBuffer {
         val start = itemStart[item]
         val size = (itemStart[item + 1] - start).toInt()
         var buf = buffers.get()

@@ -7,13 +7,16 @@ import android.os.ParcelFileDescriptor
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
+import java.nio.channels.FileChannel
 
-class Kitchen private constructor(internal val context: Context, internal val pack: PackIndex) {
-    val emojiCount: Int = pack.emojiCount
-    val categoryStart: IntArray = pack.categoryStart
-    val images: Images = Images(pack)
-    val favorites: ComboList by lazy { ComboList(pack, File(context.filesDir, "favorites.txt"), 500) }
-    val recents: ComboList by lazy { ComboList(pack, File(context.filesDir, "recents.txt"), 24) }
+class Kitchen private constructor(
+    internal val context: Context,
+    channel: FileChannel,
+    base: Long,
+) : PackIndex(channel, base) {
+    val images: Images = Images(this)
+    val favorites: ComboList by lazy { ComboList(this, File(context.filesDir, "favorites.txt"), 500) }
+    val recents: ComboList by lazy { ComboList(this, File(context.filesDir, "recents.txt"), 24) }
 
     init {
         context.registerComponentCallbacks(object : ComponentCallbacks2 {
@@ -23,14 +26,6 @@ class Kitchen private constructor(internal val context: Context, internal val pa
             override fun onLowMemory() = images.trim(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
         })
     }
-
-    fun emoji(e: Int): String = pack.emoji(e)
-    fun indexOf(emoji: String): Int = pack.indexOf(emoji)
-    fun partnerCount(e: Int): Int = pack.partnerCount(e)
-    fun partner(e: Int, k: Int): Int = pack.partner(e, k)
-    fun partnerItem(e: Int, k: Int): Int = pack.partnerItem(e, k)
-    fun item(a: Int, b: Int): Int = pack.item(a, b)
-    fun combo(item: Int): Combo = pack.combo(item)
 
     companion object {
         private const val PACK = "kitchen.pak"
@@ -51,7 +46,7 @@ class Kitchen private constructor(internal val context: Context, internal val pa
                 if (!file.isFile) return null
                 FileInputStream(file).channel to 0L
             }
-            return Kitchen(app, PackIndex(channel, base))
+            return Kitchen(app, channel, base)
         }
     }
 }
