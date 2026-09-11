@@ -1,0 +1,2 @@
+HSPLcom/kunalan/emojikitchen/**->**(**)**
+Lcom/kunalan/emojikitchen/**;

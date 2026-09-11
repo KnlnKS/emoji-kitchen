@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "emoji-kitchen"
 
-include(":app", ":core", ":ui", ":keyboard")
+include(":app", ":core", ":ui", ":keyboard", ":combopack")
