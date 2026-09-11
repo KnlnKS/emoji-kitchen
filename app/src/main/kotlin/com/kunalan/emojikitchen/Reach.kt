@@ -24,13 +24,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -133,7 +131,6 @@ internal fun ReachPage(
 @Composable
 private fun Gap(reach: Reach, grid: LazyGridState) {
     val name = stringResource(R.string.app_name)
-    val color = colorResource(R.color.logo)
     val logo = painterResource(R.drawable.ic_launcher_foreground)
     Box(
         Modifier.layout { measurable, constraints ->
@@ -145,16 +142,13 @@ private fun Gap(reach: Reach, grid: LazyGridState) {
     ) {
         Spacer(
             Modifier
-                .requiredSize(72.dp)
+                .requiredSize(108.dp)
                 .graphicsLayer {
                     val gap = reach.gap.toPx()
                     alpha = if (gap > 0f) (1f - 2f * grid.firstVisibleItemScrollOffset / gap).coerceIn(0f, 1f) else 0f
                 }
                 .semantics { contentDescription = name }
-                .drawBehind {
-                    drawCircle(color)
-                    translate(-size.width / 4, -size.height / 4) { with(logo) { draw(size * 1.5f) } }
-                },
+                .paint(logo),
         )
     }
 }
