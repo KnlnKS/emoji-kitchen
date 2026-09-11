@@ -106,7 +106,9 @@ def load(k):
     print("category histogram:")
     for cat, n in Counter(cats.values()).most_common():
         print(f"  {n:4d}  {cat!r} -> {SECTION_NAMES[SECTIONS.get(html.unescape(cat), 6)]}")
-    order = sorted(known, key=lambda cp: (section[cp], data[cp]["gBoardOrder"], cp))[:k]
+    order = sorted(known, key=lambda cp: (section[cp], data[cp]["gBoardOrder"], cp))
+    if k and k < len(order):
+        order = [order[i * len(order) // k] for i in range(k)]
     ids = {cp: i for i, cp in enumerate(order)}
     pairs = {}
     for cp in order:
