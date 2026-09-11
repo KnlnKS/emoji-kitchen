@@ -48,12 +48,15 @@ import androidx.compose.ui.unit.sp
 import com.kunalan.emojikitchen.ui.AtLeast
 import com.kunalan.emojikitchen.ui.Centered
 import com.kunalan.emojikitchen.ui.ComboCell
+import com.kunalan.emojikitchen.ui.ComboContent
 import com.kunalan.emojikitchen.ui.EmojiCell
 import com.kunalan.emojikitchen.ui.FullSpan
+import com.kunalan.emojikitchen.ui.GridContent
 import com.kunalan.emojikitchen.ui.Header
 import com.kunalan.emojikitchen.ui.KitchenIcon
 import com.kunalan.emojikitchen.ui.KitchenIcons
 import com.kunalan.emojikitchen.ui.KitchenImage
+import com.kunalan.emojikitchen.ui.Label
 import com.kunalan.emojikitchen.ui.LocalKitchen
 import com.kunalan.emojikitchen.ui.sectioned
 import com.kunalan.emojikitchen.ui.theme.KitchenFont
@@ -62,12 +65,11 @@ import com.kunalan.emojikitchen.ui.topLine
 import com.kunalan.emojikitchen.ui.R as UiR
 
 private const val STAR = -1
-private const val HEADER = 0
-private const val CELL = 1
 
 private val EmojiColumns = AtLeast(8, 52.dp)
 private val ComboColumns = AtLeast(5, 84.dp)
-private val CellType: (Int) -> Any = { CELL }
+private val BannerStyle = TextStyle(fontFamily = KitchenFont, fontSize = 12.sp)
+private val PlusStyle = TextStyle(fontFamily = KitchenFont, fontSize = 20.sp)
 
 @Composable
 internal fun KeyboardRoot(ime: KitchenIme) {
@@ -101,15 +103,17 @@ internal fun KeyboardRoot(ime: KitchenIme) {
 private fun Banner(ime: KitchenIme) {
     if (ime.acceptsImages.value) return
     val colors = KitchenTheme.colors
+    val text = colors.secondaryText
     Box(
         Modifier.fillMaxWidth().height(28.dp).background(colors.secondarySurface).padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         BasicText(
             stringResource(R.string.no_images),
-            style = TextStyle(color = colors.secondaryText, fontSize = 12.sp, fontFamily = KitchenFont),
-            maxLines = 1,
+            style = BannerStyle,
             overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            color = { text },
         )
     }
 }
@@ -138,11 +142,11 @@ private fun StarGrid(ime: KitchenIme, modifier: Modifier) {
     }
     val recent = stringResource(R.string.recent)
     LazyVerticalGrid(ComboColumns, modifier, ime.starGrid) {
-        items(star.favorites.size, contentType = CellType) { ComboItem(ime, star.favorites[it], true) }
+        items(star.favorites.size, contentType = ComboContent) { ComboItem(ime, star.favorites[it], true) }
         if (star.favorites.isEmpty()) item(span = FullSpan) { Centered(hint, Modifier.fillMaxWidth().height(64.dp)) }
         if (star.recents.isNotEmpty()) {
-            item(span = FullSpan, contentType = HEADER) { Header(recent) }
-            items(star.recents.size, contentType = CellType) { ComboItem(ime, star.recents[it], false) }
+            item(span = FullSpan, contentType = GridContent.Header) { Header(recent) }
+            items(star.recents.size, contentType = ComboContent) { ComboItem(ime, star.recents[it], false) }
         }
     }
 }
@@ -190,11 +194,7 @@ private fun ComboHeader(ime: KitchenIme, base: Int) {
             Icon(KitchenIcons.Back, stringResource(R.string.back), colors.primaryText)
         }
         KitchenImage(base, Modifier.size(28.dp))
-        BasicText(
-            "+",
-            Modifier.padding(start = 8.dp),
-            style = TextStyle(color = colors.secondaryText, fontSize = 20.sp, fontFamily = KitchenFont),
-        )
+        Label("+", PlusStyle, colors.secondaryText, Modifier.padding(start = 8.dp))
     }
 }
 

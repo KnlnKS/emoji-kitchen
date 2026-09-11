@@ -81,7 +81,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     internal val onEmoji: (Int) -> Unit = { e ->
-        combo = kitchen!!.comboMode(e)
+        combo = ComboMode(e, Sections(kitchen!!.partnerSectionStarts(e)))
         comboGrid.requestScrollToItem(0)
     }
 
@@ -130,7 +130,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     private fun prewarm(k: Kitchen, list: ComboList) {
         val items = list.items
         for (i in 0 until minOf(PREWARM, items.size)) {
-            val item = k.itemOf(items[i])
+            val item = k.item(items[i])
             if (item >= 0 && k.images.peek(item) == null) lifecycleScope.launch { k.images.load(item) }
         }
     }
@@ -200,15 +200,13 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 }
 
-private fun Kitchen.itemOf(c: Combo): Int = item(c.a, c.b)
-
 private fun Kitchen.itemsOf(list: List<Combo>, limit: Int, skip: ComboList?): IntArray {
     val out = IntArray(minOf(limit, list.size))
     var n = 0
     for (c in list) {
         if (n == out.size) break
         if (skip != null && c in skip) continue
-        val item = itemOf(c)
+        val item = item(c)
         if (item >= 0) out[n++] = item
     }
     return if (n == out.size) out else out.copyOf(n)
