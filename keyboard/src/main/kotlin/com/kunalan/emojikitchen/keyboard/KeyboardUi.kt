@@ -73,7 +73,7 @@ private val PlusStyle = TextStyle(fontFamily = KitchenFont, fontSize = 20.sp)
 internal fun KeyboardRoot(ime: KitchenIme) {
     KitchenTheme {
         val colors = KitchenTheme.colors
-        val kitchen = ime.kitchen
+        val state = ime.state
         Column(
             Modifier
                 .fillMaxWidth()
@@ -81,16 +81,16 @@ internal fun KeyboardRoot(ime: KitchenIme) {
                 .topLine(colors.border)
                 .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
         ) {
-            if (kitchen == null) {
+            if (state == null) {
                 Centered(stringResource(R.string.data_missing), Modifier.fillMaxWidth().height(56.dp))
             } else {
-                CompositionLocalProvider(LocalKitchen provides kitchen) {
+                CompositionLocalProvider(LocalKitchen provides state.kitchen) {
                     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
                     Column(Modifier.fillMaxWidth().height(if (landscape) 156.dp else 236.dp)) {
-                        Banner(ime)
-                        Content(ime)
+                        if (!ime.acceptsImages) Banner()
+                        Content(state)
                     }
-                    Bar(ime)
+                    Bar(state, ime.canSwitch, ime.onGlobe, ime.onGlobeLong)
                 }
             }
         }
@@ -98,8 +98,7 @@ internal fun KeyboardRoot(ime: KitchenIme) {
 }
 
 @Composable
-private fun Banner(ime: KitchenIme) {
-    if (ime.acceptsImages.value) return
+private fun Banner() {
     val colors = KitchenTheme.colors
     val text = colors.secondaryText
     Box(
@@ -117,75 +116,75 @@ private fun Banner(ime: KitchenIme) {
 }
 
 @Composable
-private fun ColumnScope.Content(ime: KitchenIme) {
+private fun ColumnScope.Content(state: KeyboardState) {
     val fill = Modifier.fillMaxWidth().weight(1f)
-    when (val mode = ime.mode) {
-        Mode.Star -> StarGrid(ime, fill)
-        Mode.Emoji -> EmojiGrid(ime, fill)
+    when (val mode = state.mode) {
+        Mode.Star -> StarGrid(state, fill)
+        Mode.Emoji -> EmojiGrid(state, fill)
         is Mode.Combo -> {
-            ComboHeader(ime, mode.base)
-            ComboGrid(ime, mode, fill)
+            ComboHeader(mode.base, state.onBack)
+            ComboGrid(state, mode, fill)
         }
     }
 }
 
 @Composable
-private fun StarGrid(ime: KitchenIme, modifier: Modifier) {
-    val star = ime.star
+private fun StarGrid(state: KeyboardState, modifier: Modifier) {
+    val star = state.star
     val hint = stringResource(R.string.save_hint)
     if (star.favorites.isEmpty() && star.recents.isEmpty()) {
         Centered(hint, modifier)
         return
     }
     val recent = stringResource(R.string.recent)
-    LazyVerticalGrid(ComboColumns, modifier, ime.starGrid) {
-        items(star.favorites.size, contentType = ComboContent) { ComboItem(ime, star.favorites[it], true) }
+    LazyVerticalGrid(ComboColumns, modifier, state.starGrid) {
+        items(star.favorites.size, contentType = ComboContent) { ComboItem(state, star.favorites[it], true) }
         if (star.favorites.isEmpty()) item(span = FullSpan) { Centered(hint, Modifier.fillMaxWidth().height(64.dp)) }
         if (star.recents.isNotEmpty()) {
             item(span = FullSpan, contentType = GridContent.Header) { Header(recent) }
-            items(star.recents.size, contentType = ComboContent) { ComboItem(ime, star.recents[it], false) }
+            items(star.recents.size, contentType = ComboContent) { ComboItem(state, star.recents[it], false) }
         }
     }
 }
 
 @Composable
-private fun EmojiGrid(ime: KitchenIme, modifier: Modifier) {
-    val kitchen = LocalKitchen.current
+private fun EmojiGrid(state: KeyboardState, modifier: Modifier) {
+    val kitchen = state.kitchen
     val names = stringArrayResource(UiR.array.sections)
-    LazyVerticalGrid(EmojiColumns, modifier, ime.emojiGrid) {
-        sectioned(ime.emojiSections, names) { e ->
-            EmojiCell(e, selected = false, enabled = kitchen.partnerCount(e) > 0, onClick = ime.onEmoji)
+    LazyVerticalGrid(EmojiColumns, modifier, state.emojiGrid) {
+        sectioned(state.emojiSections, names) { e ->
+            EmojiCell(e, selected = false, enabled = kitchen.partnerCount(e) > 0, onClick = state.onEmoji)
         }
     }
 }
 
 @Composable
-private fun ComboGrid(ime: KitchenIme, combo: Mode.Combo, modifier: Modifier) {
-    val kitchen = LocalKitchen.current
+private fun ComboGrid(state: KeyboardState, combo: Mode.Combo, modifier: Modifier) {
+    val kitchen = state.kitchen
     val names = stringArrayResource(UiR.array.sections)
-    LazyVerticalGrid(ComboColumns, modifier, ime.comboGrid) {
-        sectioned(combo.sections, names) { k -> ComboItem(ime, kitchen.partnerItem(combo.base, k), false) }
+    LazyVerticalGrid(ComboColumns, modifier, state.comboGrid) {
+        sectioned(combo.sections, names) { k -> ComboItem(state, kitchen.partnerItem(combo.base, k), false) }
     }
 }
 
 @Composable
-private fun ComboItem(ime: KitchenIme, item: Int, favorite: Boolean) {
+private fun ComboItem(state: KeyboardState, item: Int, dimUnstarred: Boolean) {
     ComboCell(
         item,
-        onClick = ime.onSend,
+        onClick = state.onSend,
         modifier = Modifier.drawWithContent {
-            if (ime.pulseItem == item) scale(ime.pulse.value) { this@drawWithContent.drawContent() } else drawContent()
+            if (state.pulseItem == item) scale(state.pulse.value) { this@drawWithContent.drawContent() } else drawContent()
         },
-        dimUnstarred = favorite,
+        dimUnstarred = dimUnstarred,
     )
 }
 
 @Composable
-private fun ComboHeader(ime: KitchenIme, base: Int) {
+private fun ComboHeader(base: Int, onBack: () -> Unit) {
     val colors = KitchenTheme.colors
     Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.width(48.dp).fillMaxHeight().clickable(role = Role.Button, onClick = ime.onBack),
+            Modifier.width(48.dp).fillMaxHeight().clickable(role = Role.Button, onClick = onBack),
             contentAlignment = Alignment.Center,
         ) {
             Icon(KitchenIcons.Back, stringResource(R.string.back), colors.primaryText)
@@ -196,33 +195,33 @@ private fun ComboHeader(ime: KitchenIme, base: Int) {
 }
 
 @Composable
-private fun Bar(ime: KitchenIme) {
-    val section by remember(ime) {
+private fun Bar(state: KeyboardState, canSwitch: Boolean, onGlobe: () -> Unit, onGlobeLong: () -> Unit) {
+    val section by remember(state) {
         derivedStateOf {
-            when (val mode = ime.mode) {
+            when (val mode = state.mode) {
                 Mode.Star -> null
-                Mode.Emoji -> ime.emojiSections.at(ime.emojiGrid.firstVisibleItemIndex)
-                is Mode.Combo -> mode.sections.at(ime.comboGrid.firstVisibleItemIndex)
+                Mode.Emoji -> state.emojiSections.at(state.emojiGrid.firstVisibleItemIndex)
+                is Mode.Combo -> mode.sections.at(state.comboGrid.firstVisibleItemIndex)
             }
         }
     }
     val colors = KitchenTheme.colors
     val names = stringArrayResource(UiR.array.sections)
     Row(Modifier.fillMaxWidth().height(44.dp).topLine(colors.border)) {
-        if (ime.canSwitch.value) {
+        if (canSwitch) {
             Box(
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .combinedClickable(role = Role.Button, onLongClick = ime.onGlobeLong, onClick = ime.onGlobe),
+                    .combinedClickable(role = Role.Button, onLongClick = onGlobeLong, onClick = onGlobe),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(KitchenIcons.Globe, stringResource(R.string.next_keyboard), colors.secondaryText)
             }
         }
-        Tab(KitchenIcons.Star, stringResource(R.string.favorites), section == null, ime.onStar)
+        Tab(KitchenIcons.Star, stringResource(R.string.favorites), section == null, state.onStar)
         KitchenIcons.Sections.forEachIndexed { s, icon ->
-            Tab(icon, names[s], section == s) { ime.onSection(s) }
+            Tab(icon, names[s], section == s) { state.onSection(s) }
         }
     }
 }
