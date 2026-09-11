@@ -27,11 +27,9 @@ NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/51
 CWEBP = shutil.which("cwebp") or "/opt/homebrew/bin/cwebp"
 DWEBP = shutil.which("dwebp")
 ORDER = Path(__file__).with_name("google-order.txt")
-SECTION_NAMES = ["Smileys and emotions", "Animals and nature", "Food and drink", "Travel and places",
-                 "Activities and events", "Objects", "Symbols"]
 SECTIONS = {"smileys & emotion": 0, "people & body": 0, "animals & nature": 1, "food & drink": 2,
             "travel & places": 3, "activities": 4, "objects": 5}
-C = len(SECTION_NAMES)
+C = 7
 MAGIC, VERSION = 0x4B504B45, 1
 HEADER = struct.Struct("<IHH11I12x")
 RETRIES = 3
