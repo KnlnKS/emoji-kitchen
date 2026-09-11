@@ -19,13 +19,9 @@ import com.kunalan.emojikitchen.ui.theme.KitchenTheme
 
 class MainActivity : ComponentActivity() {
     private var keyboardSetup by mutableStateOf(false)
-    private val ime by lazy { ComponentName(this, KitchenIme::class.java) }
-    private val inputMethods by lazy { getSystemService(InputMethodManager::class.java) }
+    private val imeId by lazy { ComponentName(this, KitchenIme::class.java).flattenToShortString() }
 
-    private val setUpKeyboard: () -> Unit = {
-        if (imeEnabled()) inputMethods.showInputMethodPicker()
-        else startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-    }
+    private val setUpKeyboard: () -> Unit = { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -41,21 +37,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        refreshKeyboardSetup()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) refreshKeyboardSetup()
-    }
-
-    private fun refreshKeyboardSetup() {
-        val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-        keyboardSetup = !imeEnabled() || ComponentName.unflattenFromString(current.orEmpty()) != ime
-    }
-
-    private fun imeEnabled(): Boolean {
-        val id = ime.flattenToShortString()
-        return inputMethods.enabledInputMethodList.any { it.id == id }
+        keyboardSetup = getSystemService(InputMethodManager::class.java).enabledInputMethodList.none { it.id == imeId }
     }
 }
