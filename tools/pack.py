@@ -225,7 +225,7 @@ def container(path):
     assert struct.unpack_from(">IBBH", head, k) == (0, 0x44, 0, 2)
     color, alpha = struct.unpack_from(">HHHII", head, k + 8), struct.unpack_from(">HHHII", head, k + 22)
     assert color[2] == alpha[2] == 1 and alpha[3] == off + 8 and color[3] == alpha[3] + alpha[4]
-    assert color[3] + color[4] == os.path.getsize(path) and alpha[4] < 2 ** 16
+    assert color[3] + color[4] == os.path.getsize(path)
     fields = (k + 14, k + 18, k + 32)
     template = bytearray(head[:off + 8])
     for i in (*fields, off):
@@ -234,8 +234,8 @@ def container(path):
 
 
 def rebuild(template, fields, alpha, payload):
-    avif = bytearray(template)
-    for i, v in zip((*fields, len(template) - 8), (len(template) + alpha, len(payload) - alpha, alpha, len(payload) + 8)):
+    avif, t, size = bytearray(template), len(template), len(payload)
+    for i, v in zip((*fields, t - 8), (t + alpha, size - alpha, alpha, size + 8)):
         struct.pack_into(">I", avif, i, v)
     return avif + payload
 
@@ -243,11 +243,10 @@ def rebuild(template, fields, alpha, payload):
 def write_pack(path, emojis, cat_start, pairs, images):
     assert sys.byteorder == "little"
     n, p = len(emojis), len(pairs)
+    template, layout, *_ = container(images[0])
     alpha_len, sizes = array("H"), []
     for i in images:
         head, fields, alpha, size = container(i)
-        if not sizes:
-            template, layout = head, fields
         assert (head, fields) == (template, layout)
         alpha_len.append(alpha)
         sizes.append(size)
