@@ -53,7 +53,9 @@ The `unzip -v` output must show `Stored`.
 
 ## CI releases
 
-Every push to `main` runs `.github/workflows/ci.yml`. It builds `bundleRelease` with the full pack, uses bundletool to turn it into a signed universal APK with the pack folded in, and publishes that as release `v1.0.<run number>`. Pull requests only run the unit tests and build a debug APK.
+Every code push to `main` and manual CI run on `main` runs `.github/workflows/ci.yml`. After unit tests pass, it builds a signed `bundleRelease` with the full pack, publishes a signed universal APK as GitHub release `v1.0.<run number>`, and submits the same version to Google Play's production track. Google still controls review and publication timing. Pull requests only run the unit tests and build a debug APK. Documentation-only pushes do not trigger a build.
+
+The `play-release` Actions artifact retains the signed AAB and R8 mapping for 14 days. Signing credentials are removed after the build. A failed Play submission fails the workflow; it is never silently skipped.
 
 The packs are never committed, so CI downloads them from the `pack` pre-release. After rebuilding them, replace its assets:
 
@@ -61,7 +63,7 @@ The packs are never committed, so CI downloads them from the `pack` pre-release.
 gh release upload pack $EK_DATA/out/kitchen.pak $EK_DATA/out/kitchen-mini.pak --clobber
 ```
 
-CI signs the APK with the upload key, read from four repository secrets:
+CI signs both the AAB and APK with the upload key, read from four repository secrets:
 
 ```
 base64 < ~/keys/emoji-kitchen-upload.jks | gh secret set KEYSTORE_BASE64
@@ -71,3 +73,17 @@ gh secret set KEY_PASSWORD
 ```
 
 A run on `main` fails in its first step if any of them is missing. GitHub APKs are signed with the upload key rather than Play's app signing key, so a GitHub install and a Play install can't update each other.
+
+## Google Play setup
+
+Create `com.kunalan.emojikitchen` in Play Console and complete its store listing, app content declarations, country availability, and first release. Upload the signed AAB from the `play-release` artifact manually for the first release; the publishing API requires an existing app. Use the full pack and enroll in Play App Signing.
+
+Enable the Google Play Android Developer API in a dedicated Google Cloud project. Create a publishing service account without Google Cloud project roles. In Play Console, grant it access only to Emoji Kitchen, with app information viewing and production release permissions. Save its JSON key directly as the `PLAY_SERVICE_ACCOUNT_JSON` repository secret; never commit it:
+
+```
+gh secret set PLAY_SERVICE_ACCOUNT_JSON < /secure/path/play-service-account.json
+```
+
+Once the first release is ready and the secret is configured, subsequent `main` builds automatically upload the AAB and mapping, complete the production rollout, and send the changes for review. Managed publishing must be off for approved updates to publish automatically. If Google requires testing or further declarations, complete those requirements in Play Console first.
+
+To retry a failed upload before Play accepts the version, rerun only the failed publishing job. After Play accepts a version code, start a new workflow run for a new build number instead of rerunning the build with that same code.
