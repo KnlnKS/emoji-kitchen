@@ -24,6 +24,6 @@ The app does not collect personal information from children or other users.
 
 ## Contact and updates
 
-For privacy questions, contact the developer through the [Emoji Kitchen support page](https://github.com/KnlnKS/emoji-kitchen/issues). Issues posted there are public, so do not include private information.
+For privacy questions, email [kunalan.k.subagaran@gmail.com](mailto:kunalan.k.subagaran@gmail.com).
 
 Updates to this policy will appear on this page with a revised effective date.
