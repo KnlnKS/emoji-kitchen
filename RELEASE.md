@@ -87,3 +87,9 @@ gh secret set PLAY_SERVICE_ACCOUNT_JSON < /secure/path/play-service-account.json
 Once the first release is ready and the secret is configured, subsequent `main` builds automatically upload the AAB and mapping, complete the production rollout, and send the changes for review. Managed publishing must be off for approved updates to publish automatically. If Google requires testing or further declarations, complete those requirements in Play Console first.
 
 To retry a failed upload before Play accepts the version, rerun only the failed publishing job. After Play accepts a version code, start a new workflow run for a new build number instead of rerunning the build with that same code.
+
+## Configured publisher
+
+The Google Play Android Developer API is enabled in Cloud project `emoji-kitchen-509314`. The service account `play-publisher@emoji-kitchen-509314.iam.gserviceaccount.com` has release access only to Emoji Kitchen, and its key is stored in `PLAY_SERVICE_ACCOUNT_JSON`. Managed publishing is off. CI run [35621012107](https://github.com/KnlnKS/emoji-kitchen/actions/runs/35621012107) verified the complete pipeline with version 1.0.5 on September 21, 2026, including the production upload and review submission. Google review is still required before a release becomes public.
+
+The source repository is private. Keep the public [privacy policy](https://gist.github.com/KnlnKS/af2e5b408e9115f34ceffe856243531e) synchronized with `PRIVACY.md`; a private repository file URL cannot serve as the store policy. Public support uses `kunalan.k.subagaran@gmail.com`.
