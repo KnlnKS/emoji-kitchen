@@ -6,7 +6,7 @@ Emoji Kitchen
 
 ## Short description
 
-Mix emoji into stickers, explore combinations, and share with an offline keyboard.
+Mix emoji into stickers and share your favorites with an offline keyboard.
 
 ## Full description
 
