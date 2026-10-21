@@ -1,19 +1,15 @@
-#!/usr/bin/env -S uv run --no-project --with pillow python3
+#!/usr/bin/env -S uv run --no-project --with pillow --with httpx python3
 import argparse
-import gzip
 import io
 import json
 import mmap
 import os
 import random
-import shutil
 import struct
 import subprocess
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
 from array import array
 from bisect import bisect_left
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -21,7 +17,10 @@ from itertools import accumulate, batched, chain
 from pathlib import Path
 from urllib.parse import urlparse
 
+import httpx
 from PIL import Image
+
+from downloads import fetch_bytes, request
 
 SIZE, QUALITY, ALPHA_QUALITY, CHROMA = 256, 30, 40, "420"
 EK_DATA = Path(os.environ.get("EK_DATA") or Path.home() / ".cache/emoji-kitchen")
@@ -34,52 +33,30 @@ NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/2D/png
 C = 7
 MAGIC, VERSION = 0x4B504B45, 3
 HEADER = struct.Struct("<IHH13I4x")
-RETRIES = 3
 BATCH = 4096
 
 
-def retry(request):
-    for attempt in range(RETRIES + 1):
-        try:
-            return request()
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                return False
-            if attempt == RETRIES:
-                raise
-        except (urllib.error.URLError, OSError):
-            if attempt == RETRIES:
-                raise
-        time.sleep(2 ** attempt)
-
-
-def fetch(urls, dest):
+def fetch(urls, dest, client):
     if dest.exists():
         return True
+    source = fetch_bytes(client, urls)
+    if source is None:
+        return False
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
-
-    def get(url):
-        req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip"})
-        with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
-            shutil.copyfileobj(gzip.GzipFile(fileobj=r) if r.headers.get("Content-Encoding") == "gzip" else r, f)
+    try:
+        part.write_bytes(source[1])
         os.replace(part, dest)
-        return True
-
-    return any(retry(lambda: get(url)) for url in urls)
-
-
-def head(url):
-    def request():
-        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=60):
-            return True
-
-    return retry(request)
+    finally:
+        part.unlink(missing_ok=True)
+    return True
 
 
 def download(url):
     dest = EK_DATA / url.rsplit("/", 1)[1]
-    fetch([url], dest)
+    if not dest.exists():
+        with httpx.Client(timeout=60, follow_redirects=True) as client:
+            fetch([url], dest, client)
     return dest.read_bytes()
 
 
@@ -103,10 +80,10 @@ def build_images(jobs):
         png, avif = PNG / rel, AVIF / f"{rel}.avif"
         if avif.exists():
             return avif
-        return encode(png, avif) if fetch(urls, png) else None
+        return encode(png, avif) if fetch(urls, png, client) else None
 
     start, out = time.monotonic(), []
-    with ThreadPoolExecutor(os.cpu_count()) as pool:
+    with httpx.Client(timeout=60, follow_redirects=True) as client, ThreadPoolExecutor(os.cpu_count()) as pool:
         for batch in batched(jobs, BATCH):
             out += pool.map(lambda j: job(*j), batch)
             print(f"images {len(out)}/{len(jobs)} {time.monotonic() - start:.0f}s")
@@ -164,8 +141,11 @@ def probe(pairs, dates):
     keys = ["_".join(p) for p in pairs]
     todo = [(key, p) for key, p in zip(keys, pairs) if key not in cache]
     if todo:
-        with ThreadPoolExecutor(32) as pool:
-            found = list(pool.map(lambda p: next(filter(head, gstatic(*p, dates)), None), (p for _, p in todo)))
+        def resolve(pair):
+            return next((url for url in gstatic(*pair, dates) if request(client, url, "HEAD") is not None), None)
+
+        with httpx.Client(timeout=60, follow_redirects=True) as client, ThreadPoolExecutor(32) as pool:
+            found = list(pool.map(resolve, (p for _, p in todo)))
         cache.update(zip((key for key, _ in todo), found))
         tmp = path.with_name(path.name + ".tmp")
         tmp.write_text(json.dumps(cache, indent=0, sort_keys=True))

@@ -14,13 +14,14 @@ from pathlib import Path
 import httpx
 from PIL import Image
 
-from pack import EK_DATA, GOOGLE_DATES, dataset_urls, gstatic, noto_urls
+from downloads import fetch_bytes
+from pack import EK_DATA, GOOGLE_DATES, HEADER, MAGIC, VERSION, dataset_urls, gstatic, noto_urls
 
 
 def catalog(path):
     with path.open("rb") as f:
-        magic, version, _, n, p, count, _, blob, span, _, adj, partner, *_ = struct.unpack("<IHH13I4x", f.read(64))
-        if (magic, version) != (0x4B504B45, 3):
+        magic, version, _, n, p, count, _, blob, span, _, adj, partner, *_ = HEADER.unpack(f.read(HEADER.size))
+        if (magic, version) != (MAGIC, VERSION):
             raise ValueError("Not a version 3 kitchen pack")
 
         def read(offset, code, count):
@@ -35,6 +36,26 @@ def catalog(path):
         pairs = [(emojis[a], emojis[b]) for a in range(n) for b in partners[starts[a]:starts[a + 1]] if a <= b]
         assert len(pairs) == p
         return emojis, pairs
+
+
+def export(client, dest, urls):
+    source = fetch_bytes(client, urls)
+    if source is None:
+        raise ValueError("No source artwork found")
+    url, data = source
+    original = Image.open(io.BytesIO(data)).convert("RGBA")
+    encoded = io.BytesIO()
+    original.save(encoded, "WEBP", lossless=True, exact=True, method=4)
+    if Image.open(io.BytesIO(encoded.getvalue())).convert("RGBA").tobytes() != original.tobytes():
+        raise ValueError("Lossless export changed pixels")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".tmp")
+    try:
+        part.write_bytes(encoded.getvalue())
+        os.replace(part, dest)
+    finally:
+        part.unlink(missing_ok=True)
+    return url
 
 
 def main():
@@ -59,35 +80,17 @@ def main():
     started, failures = time.monotonic(), []
 
     with httpx.Client(timeout=20, follow_redirects=True, limits=httpx.Limits(max_connections=args.workers)) as client:
-        def export(job):
+        def job_export(job):
             name, urls = job
-            dest = args.out / name
-            for url in urls:
-                for attempt in range(4):
-                    try:
-                        response = client.get(url)
-                        if response.status_code == 404:
-                            break
-                        response.raise_for_status()
-                        original = Image.open(io.BytesIO(response.content)).convert("RGBA")
-                        encoded = io.BytesIO()
-                        original.save(encoded, "WEBP", lossless=True, exact=True, method=4)
-                        assert Image.open(io.BytesIO(encoded.getvalue())).convert("RGBA").tobytes() == original.tobytes()
-                        dest.parent.mkdir(parents=True, exist_ok=True)
-                        part = dest.with_suffix(".tmp")
-                        part.write_bytes(encoded.getvalue())
-                        os.replace(part, dest)
-                        return name, url
-                    except (httpx.HTTPError, OSError) as error:
-                        if attempt == 3:
-                            return name, str(error)
-                        time.sleep(2 ** attempt)
-            return name, "No source artwork found"
+            try:
+                return name, export(client, args.out / name, urls)
+            except (httpx.HTTPError, OSError, ValueError) as error:
+                return name, error
 
         with ThreadPoolExecutor(args.workers) as pool:
             for batch in batched(pending, 512):
-                for name, source in pool.map(export, batch):
-                    if source.startswith("https://"):
+                for name, source in pool.map(job_export, batch):
+                    if not isinstance(source, Exception):
                         sources[name] = source
                     else:
                         failures.append((name, source))
