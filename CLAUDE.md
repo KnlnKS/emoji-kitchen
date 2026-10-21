@@ -22,7 +22,7 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
 - **Data:** generated packs live in `$EK_DATA` and are never committed. Lossless sharing artwork is committed on the separate `artwork` branch.
   - Build packs with `tools/pack.py [--emoji 70]`, which needs `uv` and Homebrew `libavif`. `$EK_DATA/out/kitchen.pak` is the full pack; `kitchen-mini.pak` holds 70 emoji spread across every section.
   - Push a pack with `tools/push-pack.sh [kitchen-mini.pak]`.
-  - Export original-resolution artwork with `tools/artwork.py --pack "$EK_DATA/out/kitchen.pak" --out /path/to/artwork-checkout`. Publish it before updating the sharing URL and cache version.
+  - Export original-resolution artwork with `tools/artwork.py --pack "$EK_DATA/out/kitchen.pak" --out /path/to/artwork-checkout`. Publish it before updating `ARTWORK_REVISION`; the download URL and cache directory share that revision.
 
 ## Modules
 | Module | Contents |

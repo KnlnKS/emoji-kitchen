@@ -79,7 +79,7 @@ git worktree add ../emoji-kitchen-artwork artwork
 tools/artwork.py --pack "$EK_DATA/out/kitchen.pak" --out ../emoji-kitchen-artwork
 ```
 
-The exporter resolves every item in that pack, compares every WebP export pixel-for-pixel with its source, and records source URLs in `sources.json`. It resumes interrupted runs. Publish the artwork before updating the pinned URL and cache version in `core/src/main/kotlin/com/kunalan/emojikitchen/core/Share.kt`.
+The exporter resolves every item in that pack, compares every WebP export pixel-for-pixel with its source, and records source URLs in `sources.json`. It resumes interrupted runs. Publish the artwork before updating `ARTWORK_REVISION` in `core/src/main/kotlin/com/kunalan/emojikitchen/core/Share.kt`; cached originals are scoped to that revision automatically.
 
 The app and the keyboard are both Jetpack Compose and run in the same process, which is how they share favorites and recents live.
 

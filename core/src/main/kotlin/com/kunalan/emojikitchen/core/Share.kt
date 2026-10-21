@@ -20,7 +20,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-private const val ARTWORK = "https://raw.githubusercontent.com/KnlnKS/emoji-kitchen/8cc1fbdf37120228d7305dc2673deac97a7cda14/"
+private const val ARTWORK_REVISION = "8cc1fbdf37120228d7305dc2673deac97a7cda14"
+private const val ARTWORK = "https://raw.githubusercontent.com/KnlnKS/emoji-kitchen/$ARTWORK_REVISION/"
 private const val MAX_DOWNLOAD = 1 shl 20
 private val shareLock = Mutex()
 
@@ -28,7 +29,7 @@ suspend fun Kitchen.pngUri(item: Int): Uri? = try {
     shareLock.withLock {
         withContext(Dispatchers.IO) {
             val path = artworkPath(item)
-            val original = File(context.cacheDir, "share/originals-v1/${path.removeSuffix(".webp")}.png")
+            val original = File(context.cacheDir, "share/originals/$ARTWORK_REVISION/${path.removeSuffix(".webp")}.png")
             if (!original.isFile) {
                 val networks = context.getSystemService(ConnectivityManager::class.java)
                 val online = networks.getNetworkCapabilities(networks.activeNetwork)
