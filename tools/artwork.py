@@ -55,14 +55,13 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     manifest = args.out / "sources.json"
     sources = json.loads(manifest.read_text()) if manifest.exists() else {}
+    pending = [job for job in jobs if job[0] not in sources or not (args.out / job[0]).is_file()]
     started, failures = time.monotonic(), []
 
     with httpx.Client(timeout=20, follow_redirects=True, limits=httpx.Limits(max_connections=args.workers)) as client:
         def export(job):
             name, urls = job
             dest = args.out / name
-            if name in sources and dest.is_file():
-                return name, sources[name]
             for url in urls:
                 for attempt in range(4):
                     try:
@@ -86,7 +85,7 @@ def main():
             return name, "No source artwork found"
 
         with ThreadPoolExecutor(args.workers) as pool:
-            for batch in batched(jobs, 512):
+            for batch in batched(pending, 512):
                 for name, source in pool.map(export, batch):
                     if source.startswith("https://"):
                         sources[name] = source
