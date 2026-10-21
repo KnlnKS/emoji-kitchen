@@ -10,6 +10,7 @@
     <string name="no_emoji">No emoji selected</string>
     <string name="copy">Copy image</string>
     <string name="copied">Copied</string>
+    <string name="copying">Copying…</string>
     <string name="favorite">Favorite</string>
     <string name="favorites">Favorites</string>
     <string name="set_up_keyboard">Set up keyboard</string>
