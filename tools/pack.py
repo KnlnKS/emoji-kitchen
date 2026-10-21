@@ -117,7 +117,9 @@ def noto_urls(cp):
     fmt = lambda parts: NOTO_URL.format("_".join(p.lower().zfill(4) for p in parts))
     parts = cp.split("-")
     stripped = [p for p in parts if p.lower() != "fe0f"]
-    return [fmt(stripped)] + ([fmt(parts)] if stripped != parts else [])
+    return [fmt(stripped)] + ([fmt(parts)] if stripped != parts else []) + [
+        f"https://fonts.gstatic.com/s/e/notoemoji/latest/{'-'.join(stripped)}/512.png",
+    ]
 
 
 def varint(b, i):
