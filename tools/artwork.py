@@ -58,32 +58,52 @@ def export(client, dest, urls):
     return url
 
 
+def save_sources(path, sources):
+    part = path.with_suffix(".tmp")
+    part.write_text(json.dumps(sources, sort_keys=True, indent=2) + "\n")
+    os.replace(part, path)
+
+
 def main():
     sys.stdout.reconfigure(line_buffering=True)
     ap = argparse.ArgumentParser(description="Export pixel-exact, full-resolution artwork for a shipped pack.")
     ap.add_argument("--pack", type=Path, default=EK_DATA / "out/kitchen.pak")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--workers", type=int, default=32)
+    ap.add_argument("--refresh", action="store_true", help="Refresh metadata and re-export all images, including unchanged URLs")
     args = ap.parse_args()
     emojis, pairs = catalog(args.pack)
-    dataset = dataset_urls()
+    dataset = dataset_urls(refresh=args.refresh)
     dates = sorted({url.split("/")[-3] for url in dataset.values()}.union(GOOGLE_DATES), reverse=True)
-    jobs = [(f"emoji/{cp}.webp", noto_urls(cp)) for cp in emojis]
+    jobs = {f"emoji/{cp}.webp": iter(noto_urls(cp)) for cp in emojis}
     for a, b in pairs:
         lo, hi = sorted((a, b))
         source = dataset.get(frozenset((a, b)))
-        jobs.append((f"combos/{lo}/{hi}.webp", chain([source] if source else [], gstatic(a, b, dates))))
+        jobs[f"combos/{lo}/{hi}.webp"] = chain([source] if source else [], gstatic(a, b, dates))
     args.out.mkdir(parents=True, exist_ok=True)
     manifest = args.out / "sources.json"
     sources = json.loads(manifest.read_text()) if manifest.exists() else {}
-    pending = [job for job in jobs if job[0] not in sources or not (args.out / job[0]).is_file()]
+    for name in sources.keys() - jobs.keys():
+        dest = args.out / name
+        if not dest.resolve().is_relative_to(args.out.resolve()):
+            raise ValueError(f"Artwork path escapes output directory: {name}")
+        dest.unlink(missing_ok=True)
+    sources = {name: {"requested": source, "url": source} if isinstance(source, str) else source
+               for name, source in sources.items() if name in jobs}
+    pending = []
+    for name, urls in jobs.items():
+        preferred = next(urls)
+        if args.refresh or sources.get(name, {}).get("requested") != preferred or not (args.out / name).is_file():
+            pending.append((name, preferred, chain([preferred], urls)))
+            sources.pop(name, None)
+    save_sources(manifest, sources)
     started, failures = time.monotonic(), []
 
     with httpx.Client(timeout=20, follow_redirects=True, limits=httpx.Limits(max_connections=args.workers)) as client:
         def job_export(job):
-            name, urls = job
+            name, preferred, urls = job
             try:
-                return name, export(client, args.out / name, urls)
+                return name, {"requested": preferred, "url": export(client, args.out / name, urls)}
             except (httpx.HTTPError, OSError, ValueError) as error:
                 return name, error
 
@@ -95,14 +115,11 @@ def main():
                     else:
                         failures.append((name, source))
                         print(f"FAILED {name}: {source}")
-                part = manifest.with_suffix(".tmp")
-                part.write_text(json.dumps(sources, sort_keys=True, indent=2) + "\n")
-                os.replace(part, manifest)
+                save_sources(manifest, sources)
                 print(f"artwork {len(sources)}/{len(jobs)} ({time.monotonic() - started:.0f}s)")
 
     if failures:
         sys.exit(f"{len(failures)} images failed; rerun to resume")
-    assert set(sources) == {name for name, _ in jobs}
     with args.pack.open("rb") as f:
         digest = hashlib.file_digest(f, "sha256").hexdigest()
     (args.out / "README.md").write_text(
@@ -110,7 +127,7 @@ def main():
         f"{len(emojis):,} base emoji and {len(pairs):,} combinations, stored as lossless WebP at their original resolution. "
         "Every export is decoded and compared pixel-for-pixel with its source, including transparency. "
         "No resizing, upscaling, or lossy compression is applied.\n\n"
-        "`sources.json` records the original URL for every image. Base emoji are from "
+        "`sources.json` records each image’s preferred (`requested`) and successfully downloaded (`url`) source. Base emoji are from "
         "[Noto Emoji](https://github.com/googlefonts/noto-emoji) under the "
         "[Apache License 2.0](https://github.com/googlefonts/noto-emoji/blob/main/LICENSE). "
         "Combination artwork belongs to Google and is not covered by this project's MIT code license.\n\n"
@@ -118,7 +135,9 @@ def main():
         "strings lexicographically: `combos/<first>/<second>.webp`; base emoji use `emoji/<codepoints>.webp`. "
         "These names are independent of item IDs in full and mini packs.\n\n"
         "Rebuild with `tools/artwork.py --pack /path/to/kitchen.pak --out /path/to/artwork-checkout` "
-        "from the source branch. Interrupted runs resume from the manifest.\n\n"
+        "from the source branch. Interrupted runs resume from the manifest; changed preferred URLs are re-exported "
+        "and entries removed from the pack are deleted. Use `--refresh` to refresh metadata and all images, "
+        "including sources whose URL has not changed.\n\n"
         f"Source pack SHA-256: `{digest}`.\n"
     )
 

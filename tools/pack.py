@@ -36,8 +36,8 @@ HEADER = struct.Struct("<IHH13I4x")
 BATCH = 4096
 
 
-def fetch(urls, dest, client):
-    if dest.exists():
+def fetch(urls, dest, client, *, refresh=False):
+    if dest.exists() and not refresh:
         return True
     source = fetch_bytes(client, urls)
     if source is None:
@@ -52,11 +52,12 @@ def fetch(urls, dest, client):
     return True
 
 
-def download(url):
+def download(url, refresh=False):
     dest = EK_DATA / url.rsplit("/", 1)[1]
-    if not dest.exists():
+    if refresh or not dest.exists():
         with httpx.Client(timeout=60, follow_redirects=True) as client:
-            fetch([url], dest, client)
+            if not fetch([url], dest, client, refresh=refresh):
+                raise FileNotFoundError(url)
     return dest.read_bytes()
 
 
@@ -154,8 +155,8 @@ def probe(pairs, dates):
     return [cache[key] for key in keys]
 
 
-def dataset_urls():
-    data = json.loads(download(METADATA_URL))["data"]
+def dataset_urls(refresh=False):
+    data = json.loads(download(METADATA_URL, refresh))["data"]
     return {frozenset((cp, other)): c["gStaticUrl"] for cp, v in data.items()
             for other, combos in v["combinations"].items() for c in combos if c["isLatest"]}
 
