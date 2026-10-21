@@ -1,16 +1,12 @@
 # Emoji Kitchen
 
-Offline Android clone of Google Search's Emoji Kitchen widget, plus an Emoji Kitchen–only keyboard (IME).
+Android clone of Google Search's Emoji Kitchen widget, plus an Emoji Kitchen–only keyboard (IME). Browsing is offline; sharing fetches full-quality artwork from GitHub when online.
 
 ## Rules
 - Absolutely no code comments.
 - Follow DRY and YAGNI, and write the most performant code you can.
 - Add tests only when absolutely necessary.
-- Make focused commits. End each commit message with:
-  ```
-  Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
-  Claude-Session: https://claude.ai/code/session_01Dujn6qjz8gx8CVYUaby258
-  ```
+- Make focused commits with accurate authorship.
 
 ## Environment
 Worktrees have no `local.properties`, so export these before running Gradle:
@@ -23,9 +19,10 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
 - **Device:** `ANDROID_SERIAL=emulator-5580`.
   - Wrap every adb command in `lockf -k "$EK_DATA/adb.lock" …`.
   - Reinstall with `adb install -r`. Never uninstall: it deletes the pushed pack.
-- **Data:** generated data lives only in `$EK_DATA` and is never committed.
+- **Data:** generated packs live in `$EK_DATA` and are never committed. Lossless sharing artwork is committed on the separate `artwork` branch.
   - Build packs with `tools/pack.py [--emoji 70]`, which needs `uv` and Homebrew `libavif`. `$EK_DATA/out/kitchen.pak` is the full pack; `kitchen-mini.pak` holds 70 emoji spread across every section.
   - Push a pack with `tools/push-pack.sh [kitchen-mini.pak]`.
+  - Export original-resolution artwork with `tools/artwork.py --pack "$EK_DATA/out/kitchen.pak" --out /path/to/artwork-checkout`. Publish it before updating the sharing URL and cache version.
 
 ## Modules
 | Module | Contents |
@@ -45,5 +42,6 @@ export EK_DATA=${EK_DATA:-$HOME/.cache/emoji-kitchen}
 - **Partner lists:** `partner(e,k)` and `partnerItem(e,k)` are ordered by partner id ascending, which is Google's order within sections. `item(a,b)` returns -1 when the pair doesn't exist.
 - **`Combo`** packs a pair as `low shl 16 or high`.
 - **Pack images:** items are raw AVIF `mdat` payloads (alpha, then color). The pack carries one container template and a per-item alpha length, and `PackIndex.read` rebuilds the AVIF in a thread-local buffer.
+- **Shared images:** paths use Unicode code points, not pack item IDs. Pair paths sort the two code point strings lexicographically. Cached originals take priority; bundled fallbacks never prevent a later online upgrade. Both app and IME use `pngUri`.
 - **Favorites and recents:** `Kitchen.favorites` and `Kitchen.recents` are snapshot-state lists shared by the app and the IME, which run in the same process.
 - **Compose:** components read `Kitchen` from `LocalKitchen` and colors from `KitchenTheme.colors`. Grid callbacks take `(Int) -> Unit`, so no lambda is allocated per cell.

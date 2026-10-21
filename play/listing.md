@@ -16,8 +16,11 @@ Combine your favorites, try a random pair, or explore combos! Save stickers you 
 
 Enable the optional Emoji Kitchen keyboard to send stickers in apps that support images. In other apps, tap a sticker to copy it to your clipboard. Favorites and recents stay in sync between the app and keyboard.
 
+Copying or sending a sticker downloads its full-quality original from our public GitHub repository when online and caches it for reuse. Offline sharing uses a cached original or the included image.
+
 Features:
 - Offline sticker collection included with the app
+- Full-quality copies and keyboard stickers when online
 - Combine and explore modes
 - Random combinations
 - Shared favorites and recents
