@@ -30,7 +30,7 @@ METADATA_URL = "https://raw.githubusercontent.com/xsalazar/emoji-kitchen-backend
 PAIRS_URL = "https://www.google.com/logos/fnbx/emoji_kitchen/emoji_kitchen_pairs.13.pb"
 GSTATIC_URL = "https://www.gstatic.com/android/keyboard/emojikitchen/{0}/{1}/{1}_{2}.png"
 GOOGLE_DATES = ("20240612", "20241004", "20241113", "20250728", "20260428", "20260728")
-NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u{}.png"
+NOTO_URL = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/2D/png/512/emoji_u{}.png"
 C = 7
 MAGIC, VERSION = 0x4B504B45, 3
 HEADER = struct.Struct("<IHH13I4x")
@@ -114,11 +114,12 @@ def build_images(jobs):
 
 
 def noto_urls(cp):
-    fmt = lambda parts: NOTO_URL.format("_".join(p.lower().zfill(4) for p in parts))
+    fmt = lambda parts: "_".join(p.lower().zfill(4) for p in parts)
     parts = cp.split("-")
     stripped = [p for p in parts if p.lower() != "fe0f"]
-    return [fmt(stripped)] + ([fmt(parts)] if stripped != parts else []) + [
-        f"https://fonts.gstatic.com/s/e/notoemoji/latest/{'-'.join(stripped)}/512.png",
+    names = [fmt(stripped)] + ([fmt(parts)] if stripped != parts else [])
+    return [NOTO_URL.format(name) for name in names] + [
+        f"https://fonts.gstatic.com/s/e/notoemoji/latest/{names[0]}/512.png",
     ]
 
 
