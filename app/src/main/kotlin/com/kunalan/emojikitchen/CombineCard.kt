@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,18 +68,32 @@ internal fun CombineCard(state: KitchenState) {
     val kitchen = LocalKitchen.current
     val colors = KitchenTheme.colors
     val scope = rememberCoroutineScope()
-    var copied by remember { mutableStateOf(false) }
+    var copied by remember { mutableIntStateOf(-1) }
+    var copying by remember { mutableStateOf(false) }
     val result = state.result
     val starred = result >= 0 && Combo.of(state.a, state.b) in kitchen.favorites
+    LaunchedEffect(copied) {
+        if (copied >= 0) {
+            delay(2000)
+            copied = -1
+        }
+    }
     val copy: () -> Unit = remember(state) {
         {
             val item = state.result
-            if (item >= 0) scope.launch {
-                kitchen.copyToClipboard(item)
-                kitchen.recents.push(Combo.of(state.a, state.b))
-                copied = true
-                delay(2000)
-                copied = false
+            if (item >= 0 && !copying) {
+                copying = true
+                copied = -1
+                scope.launch {
+                    try {
+                        if (kitchen.copyToClipboard(item)) {
+                            kitchen.recents.push(kitchen.combo(item))
+                            copied = item
+                        }
+                    } finally {
+                        copying = false
+                    }
+                }
             }
         }
     }
@@ -109,12 +124,12 @@ internal fun CombineCard(state: KitchenState) {
                     Box(
                         Modifier
                             .size(72.dp)
-                            .clickable(interactionSource = null, indication = null, enabled = result >= 0, onClick = copy),
+                            .clickable(interactionSource = null, indication = null, enabled = result >= 0 && !copying, onClick = copy),
                     ) {
                         if (result >= 0) KitchenImage(result, Modifier.fillMaxSize().padding(9.dp))
                     }
                     Row(Modifier.wrapContentWidth(unbounded = true)) {
-                        CopyButton(result >= 0, copied, copy)
+                        CopyButton(result >= 0 && !copying, copied == result && result >= 0, copying, copy)
                         StarButton(starred, result >= 0, star)
                     }
                 }
@@ -204,14 +219,14 @@ private fun Dice(slot: Int, rolls: Int, description: Int, onRoll: (Int) -> Unit)
 }
 
 @Composable
-private fun CopyButton(enabled: Boolean, copied: Boolean, onClick: () -> Unit) {
+private fun CopyButton(enabled: Boolean, copied: Boolean, copying: Boolean, onClick: () -> Unit) {
     val colors = KitchenTheme.colors
-    val reveal = animateFloatAsState(if (copied) 1f else 0f, RevealSpec)
-    val icon = animateFloatAsState(if (copied) 0f else if (enabled) 1f else 0.35f, IconSpec)
+    val reveal = animateFloatAsState(if (copied || copying) 1f else 0f, RevealSpec)
+    val icon = animateFloatAsState(if (copied || copying) 0f else if (enabled) 1f else 0.35f, IconSpec)
     Layout(
         content = {
             KitchenIcon(KitchenIcons.Copy, colors.secondaryText, Modifier.size(24.dp))
-            Label(stringResource(R.string.copied), Caption, colors.secondaryText)
+            Label(stringResource(if (copying) R.string.copying else R.string.copied), Caption, colors.secondaryText)
         },
         modifier = Modifier.circleButton(stringResource(R.string.copy), enabled, onClick),
     ) { measurables, constraints ->

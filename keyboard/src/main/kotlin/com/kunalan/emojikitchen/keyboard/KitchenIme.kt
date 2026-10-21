@@ -26,6 +26,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.kunalan.emojikitchen.core.Kitchen
 import com.kunalan.emojikitchen.core.copyToClipboard
 import com.kunalan.emojikitchen.core.pngUri
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
@@ -42,6 +44,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     internal var canSwitch by mutableStateOf(false)
         private set
     private var backDown = false
+    private var inputSession: Job? = null
     private val inputView by lazy(LazyThreadSafetyMode.NONE) {
         ComposeView(this).apply { setContent { KeyboardRoot(this@KitchenIme) } }
     }
@@ -68,6 +71,18 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
+
+    override fun onStartInput(info: EditorInfo, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        inputSession?.cancel()
+        inputSession = SupervisorJob(lifecycleScope.coroutineContext[Job])
+    }
+
+    override fun onFinishInput() {
+        inputSession?.cancel()
+        inputSession = null
+        super.onFinishInput()
+    }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
@@ -106,17 +121,21 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     private fun send(kitchen: Kitchen, item: Int) {
-        lifecycleScope.launch {
-            val uri = kitchen.pngUri(item)
-            val ic = currentInputConnection
-            val sent = acceptsImages && ic != null && InputConnectionCompat.commitContent(
+        val session = inputSession ?: return
+        val ic = currentInputConnection ?: return
+        val editor = currentInputEditorInfo ?: return
+        val insert = acceptsImages
+        lifecycleScope.launch(session) {
+            val uri = kitchen.pngUri(item) ?: return@launch
+            if (ic !== currentInputConnection) return@launch
+            val sent = insert && InputConnectionCompat.commitContent(
                 ic,
-                currentInputEditorInfo,
+                editor,
                 InputContentInfoCompat(uri, PNG, null),
                 InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION,
                 null,
             )
-            if (!sent) kitchen.copyToClipboard(item)
+            if (!sent) kitchen.copyToClipboard(uri)
             kitchen.recents.push(kitchen.combo(item))
         }
     }

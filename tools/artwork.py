@@ -1,0 +1,146 @@
+#!/usr/bin/env -S uv run --no-project --with pillow --with httpx python3
+import argparse
+import hashlib
+import io
+import json
+import os
+import struct
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from itertools import batched, chain
+from pathlib import Path
+
+import httpx
+from PIL import Image
+
+from downloads import fetch_bytes
+from pack import EK_DATA, GOOGLE_DATES, HEADER, MAGIC, VERSION, dataset_urls, gstatic, noto_urls
+
+
+def catalog(path):
+    with path.open("rb") as f:
+        magic, version, _, n, p, count, _, blob, span, _, adj, partner, *_ = HEADER.unpack(f.read(HEADER.size))
+        if (magic, version) != (MAGIC, VERSION):
+            raise ValueError("Not a version 3 kitchen pack")
+
+        def read(offset, code, count):
+            f.seek(offset)
+            return struct.unpack(f"<{count}{code}", f.read(struct.calcsize(code) * count))
+
+        spans = read(span, "i", n + 1)
+        f.seek(blob)
+        strings = f.read(spans[-1])
+        emojis = ["-".join(f"{ord(c):x}" for c in strings[spans[i]:spans[i + 1]].decode()) for i in range(n)]
+        starts, partners = read(adj, "i", n + 1), read(partner, "H", count)
+        pairs = [(emojis[a], emojis[b]) for a in range(n) for b in partners[starts[a]:starts[a + 1]] if a <= b]
+        assert len(pairs) == p
+        return emojis, pairs
+
+
+def export(client, dest, urls):
+    source = fetch_bytes(client, urls)
+    if source is None:
+        raise ValueError("No source artwork found")
+    url, data = source
+    original = Image.open(io.BytesIO(data)).convert("RGBA")
+    encoded = io.BytesIO()
+    original.save(encoded, "WEBP", lossless=True, exact=True, method=4)
+    if Image.open(io.BytesIO(encoded.getvalue())).convert("RGBA").tobytes() != original.tobytes():
+        raise ValueError("Lossless export changed pixels")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".tmp")
+    try:
+        part.write_bytes(encoded.getvalue())
+        os.replace(part, dest)
+    finally:
+        part.unlink(missing_ok=True)
+    return url
+
+
+def save_sources(path, sources):
+    part = path.with_suffix(".tmp")
+    part.write_text(json.dumps(sources, sort_keys=True, indent=2) + "\n")
+    os.replace(part, path)
+
+
+def main():
+    sys.stdout.reconfigure(line_buffering=True)
+    ap = argparse.ArgumentParser(description="Export pixel-exact, full-resolution artwork for a shipped pack.")
+    ap.add_argument("--pack", type=Path, default=EK_DATA / "out/kitchen.pak")
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--workers", type=int, default=32)
+    ap.add_argument("--refresh", action="store_true", help="Refresh metadata and re-export all images, including unchanged URLs")
+    args = ap.parse_args()
+    emojis, pairs = catalog(args.pack)
+    dataset = dataset_urls(refresh=args.refresh)
+    dates = sorted({url.split("/")[-3] for url in dataset.values()}.union(GOOGLE_DATES), reverse=True)
+    jobs = {f"emoji/{cp}.webp": iter(noto_urls(cp)) for cp in emojis}
+    for a, b in pairs:
+        lo, hi = sorted((a, b))
+        source = dataset.get(frozenset((a, b)))
+        jobs[f"combos/{lo}/{hi}.webp"] = chain([source] if source else [], gstatic(a, b, dates))
+    args.out.mkdir(parents=True, exist_ok=True)
+    manifest = args.out / "sources.json"
+    sources = json.loads(manifest.read_text()) if manifest.exists() else {}
+    for name in sources.keys() - jobs.keys():
+        dest = args.out / name
+        if not dest.resolve().is_relative_to(args.out.resolve()):
+            raise ValueError(f"Artwork path escapes output directory: {name}")
+        dest.unlink(missing_ok=True)
+    sources = {name: {"requested": source, "url": source} if isinstance(source, str) else source
+               for name, source in sources.items() if name in jobs}
+    pending = []
+    for name, urls in jobs.items():
+        preferred = next(urls)
+        if args.refresh or sources.get(name, {}).get("requested") != preferred or not (args.out / name).is_file():
+            pending.append((name, preferred, chain([preferred], urls)))
+            sources.pop(name, None)
+    save_sources(manifest, sources)
+    started, failures = time.monotonic(), []
+
+    with httpx.Client(timeout=20, follow_redirects=True, limits=httpx.Limits(max_connections=args.workers)) as client:
+        def job_export(job):
+            name, preferred, urls = job
+            try:
+                return name, {"requested": preferred, "url": export(client, args.out / name, urls)}
+            except (httpx.HTTPError, OSError, ValueError) as error:
+                return name, error
+
+        with ThreadPoolExecutor(args.workers) as pool:
+            for batch in batched(pending, 512):
+                for name, source in pool.map(job_export, batch):
+                    if not isinstance(source, Exception):
+                        sources[name] = source
+                    else:
+                        failures.append((name, source))
+                        print(f"FAILED {name}: {source}")
+                save_sources(manifest, sources)
+                print(f"artwork {len(sources)}/{len(jobs)} ({time.monotonic() - started:.0f}s)")
+
+    if failures:
+        sys.exit(f"{len(failures)} images failed; rerun to resume")
+    with args.pack.open("rb") as f:
+        digest = hashlib.file_digest(f, "sha256").hexdigest()
+    (args.out / "README.md").write_text(
+        "# Emoji Kitchen artwork\n\n"
+        f"{len(emojis):,} base emoji and {len(pairs):,} combinations, stored as lossless WebP at their original resolution. "
+        "Every export is decoded and compared pixel-for-pixel with its source, including transparency. "
+        "No resizing, upscaling, or lossy compression is applied.\n\n"
+        "`sources.json` records each image’s preferred (`requested`) and successfully downloaded (`url`) source. Base emoji are from "
+        "[Noto Emoji](https://github.com/googlefonts/noto-emoji) under the "
+        "[Apache License 2.0](https://github.com/googlefonts/noto-emoji/blob/main/LICENSE). "
+        "Combination artwork belongs to Google and is not covered by this project's MIT code license.\n\n"
+        "Paths use lowercase Unicode code points separated by hyphens. Combination paths sort the two code point "
+        "strings lexicographically: `combos/<first>/<second>.webp`; base emoji use `emoji/<codepoints>.webp`. "
+        "These names are independent of item IDs in full and mini packs.\n\n"
+        "Rebuild with `tools/artwork.py --pack /path/to/kitchen.pak --out /path/to/artwork-checkout` "
+        "from the source branch. Interrupted runs resume from the manifest; changed preferred URLs are re-exported "
+        "and entries removed from the pack are deleted. Use `--refresh` to refresh metadata and all images, "
+        "including sources whose URL has not changed.\n\n"
+        f"Source pack SHA-256: `{digest}`.\n"
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -21,6 +21,11 @@ class PackIndexTest {
             assertEquals(n, pack.categoryStart[7])
             assertTrue(pack.pairCount > 0)
             assertEquals(-1, pack.indexOf("x"))
+            val smile = pack.indexOf("😀")
+            val heart = pack.indexOf("❣️")
+            assertEquals("emoji/1f642-200d-2195-fe0f.webp", pack.artworkPath(pack.indexOf("🙂‍↕️")))
+            assertEquals("combos/1f600/2763-fe0f.webp", pack.artworkPath(pack.item(heart, smile)))
+            assertEquals("combos/1f600/1f600.webp", pack.artworkPath(pack.item(smile, smile)))
             var entries = 0
             var selfPairs = 0
             for (a in 0 until n) {
