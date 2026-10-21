@@ -26,6 +26,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.kunalan.emojikitchen.core.Kitchen
 import com.kunalan.emojikitchen.core.copyToClipboard
 import com.kunalan.emojikitchen.core.pngUri
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
@@ -42,7 +44,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     internal var canSwitch by mutableStateOf(false)
         private set
     private var backDown = false
-    private var inputSession = 0
+    private var inputSession: Job? = null
     private val inputView by lazy(LazyThreadSafetyMode.NONE) {
         ComposeView(this).apply { setContent { KeyboardRoot(this@KitchenIme) } }
     }
@@ -72,11 +74,13 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
 
     override fun onStartInput(info: EditorInfo, restarting: Boolean) {
         super.onStartInput(info, restarting)
-        inputSession++
+        inputSession?.cancel()
+        inputSession = SupervisorJob(lifecycleScope.coroutineContext[Job])
     }
 
     override fun onFinishInput() {
-        inputSession++
+        inputSession?.cancel()
+        inputSession = null
         super.onFinishInput()
     }
 
@@ -117,13 +121,13 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     private fun send(kitchen: Kitchen, item: Int) {
-        val session = inputSession
+        val session = inputSession ?: return
         val ic = currentInputConnection ?: return
         val editor = currentInputEditorInfo ?: return
         val insert = acceptsImages
-        lifecycleScope.launch {
+        lifecycleScope.launch(session) {
             val uri = kitchen.pngUri(item) ?: return@launch
-            if (session != inputSession || ic !== currentInputConnection) return@launch
+            if (ic !== currentInputConnection) return@launch
             val sent = insert && InputConnectionCompat.commitContent(
                 ic,
                 editor,
