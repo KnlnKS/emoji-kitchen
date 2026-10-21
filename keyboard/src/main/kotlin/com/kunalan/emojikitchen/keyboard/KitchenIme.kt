@@ -42,6 +42,7 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     internal var canSwitch by mutableStateOf(false)
         private set
     private var backDown = false
+    private var inputSession = 0
     private val inputView by lazy(LazyThreadSafetyMode.NONE) {
         ComposeView(this).apply { setContent { KeyboardRoot(this@KitchenIme) } }
     }
@@ -68,6 +69,16 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
+
+    override fun onStartInput(info: EditorInfo, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        inputSession++
+    }
+
+    override fun onFinishInput() {
+        inputSession++
+        super.onFinishInput()
+    }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
@@ -106,17 +117,21 @@ class KitchenIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     private fun send(kitchen: Kitchen, item: Int) {
+        val session = inputSession
+        val ic = currentInputConnection ?: return
+        val editor = currentInputEditorInfo ?: return
+        val insert = acceptsImages
         lifecycleScope.launch {
-            val uri = kitchen.pngUri(item)
-            val ic = currentInputConnection
-            val sent = acceptsImages && ic != null && InputConnectionCompat.commitContent(
+            val uri = kitchen.pngUri(item) ?: return@launch
+            if (session != inputSession || ic !== currentInputConnection) return@launch
+            val sent = insert && InputConnectionCompat.commitContent(
                 ic,
-                currentInputEditorInfo,
+                editor,
                 InputContentInfoCompat(uri, PNG, null),
                 InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION,
                 null,
             )
-            if (!sent) kitchen.copyToClipboard(item)
+            if (!sent) kitchen.copyToClipboard(uri)
             kitchen.recents.push(kitchen.combo(item))
         }
     }
